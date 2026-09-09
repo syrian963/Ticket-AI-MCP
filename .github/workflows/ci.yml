@@ -1,0 +1,66 @@
+# A test suite nobody runs protects nothing. This runs the whole of it on
+# every push and every pull request.
+#
+# The matrix is not decoration: the project claims 3.12 through 3.14 in its
+# classifiers, and the only way that claim stays true is if something checks
+# it. 3.14 in particular has already moved under this code once - `datetime.UTC`
+# replaced `timezone.utc` in the lint's eyes partway through.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A second push to the same branch makes the first run's answer worthless.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --frozen --python ${{ matrix.python }}
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Test
+        # The gate is deliberate. Coverage that is only ever looked at drifts
+        # down a percent at a time until it means nothing.
+        run: uv run pytest --cov=ticket_ai_mcp --cov-report=term-missing --cov-fail-under=80
+
+  # The suite never touches a network, and it has to stay that way: a test
+  # that quietly depends on a live tracker fails for whoever forks this.
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Tests must pass with no credentials in the environment
+        env:
+          TICKET_AI_TRACKER: ""
+          TICKET_AI_PROJECT: ""
+          TICKET_AI_GITLAB_TOKEN: ""
+          TICKET_AI_GITHUB_TOKEN: ""
+          TICKET_AI_JIRA_TOKEN: ""
+        run: uv run pytest -q
