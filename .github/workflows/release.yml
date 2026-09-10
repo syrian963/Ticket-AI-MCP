@@ -1,0 +1,80 @@
+# Publishing is driven by a tag, and the tag has to agree with the version in
+# pyproject.toml and in server.json. A release that says 0.1.0 on PyPI, 0.1.1
+# in the metadata and 0.0.9 in the registry manifest is a support question
+# nobody can answer, so this refuses rather than guesses.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: The tag and the declared version have to match
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(uv run python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          echo "tag $tag, pyproject $declared"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag v$tag does not match version $declared in pyproject.toml"
+            exit 1
+          fi
+
+      - name: The changelog has to mention it
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          if ! grep -q "\[$tag\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $tag"
+            exit 1
+          fi
+
+      # The manifest agreeing with pyproject is a test, so running the suite
+      # covers it - no second implementation of the same check.
+      - name: Everything green before anything is published
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest -q
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - run: uv run --with twine twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      # Trusted publishing: PyPI verifies the workflow rather than a token, so
+      # there is no long-lived credential in this repository at all.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -132,6 +132,48 @@ def _candidates(root: Path) -> list[Path]:
     return found
 
 
+# A file that records every change mentions every word the project has ever
+# used, so it scores on any query at all. Measured across six unrelated
+# subjects on two checkouts: `CHANGES.rst` came back for five of six, and
+# `CHANGELOG.md` for five of six - not because it is relevant six times but
+# because it is a concatenation of every subject the project has had.
+#
+# Halved rather than excluded. It is still the right answer to "the changelog
+# is missing an entry", and a name match will carry it there. This is only
+# about it crowding out the file the work actually lands in.
+CHANGELOG_NAMES = frozenset({"changelog", "changes", "history", "news", "releases", "whatsnew"})
+CHANGELOG_WEIGHT = 0.5
+
+
+def _is_changelog(relative: str) -> bool:
+    stem = relative.rsplit("/", 1)[-1].split(".", 1)[0].replace("_", "-").replace(" ", "-").lower()
+    return stem in CHANGELOG_NAMES or stem.replace("-", "") in CHANGELOG_NAMES
+
+
+def _names_it(term: str, name_words: set[str]) -> bool:
+    """Does this path name the thing the subject is about?
+
+    Exact match, or a difference of one trailing `s`. Nothing more: this is
+    not a stemmer and should not become one, because every rule added here
+    trades a real hit for some number of wrong ones.
+
+    The plural is worth the exception because it is the failure. Asked about a
+    "session cookie" on Flask, the search scored `src/flask/sessions.py` the
+    same as `docs/templating.rst` - the file named after the subject got no
+    name bonus at all, because the subject says `session` and the file says
+    `sessions`, and lost the tie alphabetically. Same for `blueprint` against
+    `blueprints.py`. A four-character stem keeps it away from `bus`, `class`
+    and the like.
+    """
+    if term in name_words:
+        return True
+    singular = term[:-1] if term.endswith("s") else term
+    plural = f"{term}s"
+    if len(singular) < 4:
+        return False
+    return singular in name_words or plural in name_words
+
+
 def search(root: Path, subject: str, *, limit: int = 12) -> list[FileHit]:
     """Find the files in `root` that mention what the subject is about.
 
@@ -155,7 +197,7 @@ def search(root: Path, subject: str, *, limit: int = 12) -> list[FileHit]:
 
         relative = path.relative_to(root).as_posix()
         name_words = set(tokens(relative))
-        in_name = tuple(t for t in terms if t in name_words)
+        in_name = tuple(t for t in terms if _names_it(t, name_words))
 
         lowered = text.lower()
         in_body = tuple(t for t in terms if t in lowered)
@@ -166,6 +208,8 @@ def search(root: Path, subject: str, *, limit: int = 12) -> list[FileHit]:
         # several distinct terms is worth more than matching one repeatedly -
         # a file that says "filter" forty times is not about destinations.
         score = len(in_name) * 4.0 + len(in_body) * 1.0
+        if _is_changelog(relative):
+            score *= CHANGELOG_WEIGHT
         hits.append(
             FileHit(
                 path=relative,

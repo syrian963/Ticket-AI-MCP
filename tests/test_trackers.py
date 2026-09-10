@@ -224,9 +224,27 @@ class TestGitLab:
         with pytest.raises(TrackerError, match="project path"):
             tracker.fetch("acme/shop", "#42")
 
-    def test_a_token_is_required(self):
-        with pytest.raises(TrackerError, match="read_api"):
-            GitLabTracker(url="https://git.example.com", token="")
+    def test_a_url_is_required(self):
+        with pytest.raises(TrackerError, match="base url"):
+            GitLabTracker(url="", token="t")
+
+    def test_no_token_reads_anonymously_and_sends_no_header(self):
+        # Every public project on gitlab.com answers the issues API without a
+        # token. Refusing to start without one shut the tool out of exactly the
+        # open-source boards it is most useful to learn from.
+        tracker = GitLabTracker(url="https://gitlab.com", token="")
+        assert tracker.anonymous
+        assert "PRIVATE-TOKEN" not in tracker._client.headers
+
+    def test_anonymously_a_missing_project_might_just_be_private(self):
+        # GitLab hides a private project rather than refusing it, so without a
+        # token a typo and a permission problem arrive as the same 404. The
+        # message has to offer both.
+        tracker = GitLabTracker(
+            url="https://gitlab.com", token="", client=client("https://gitlab.com/api/v4", {})
+        )
+        with pytest.raises(TrackerError, match="TICKET_AI_GITLAB_TOKEN"):
+            tracker.search(TicketQuery(project="acme/shop", limit=5))
 
 
 class TestGitHub:
@@ -302,8 +320,17 @@ class TestGitHub:
                 base_url="https://api.github.com", transport=httpx.MockTransport(handler)
             ),
         )
-        assert tracker.search(TicketQuery(project="a/b", limit=50)) == []
-        assert len(calls) == 10
+        # All rows and no issues now raises rather than returning empty - see
+        # `test_github.py`, where a repository with issues switched off was
+        # silently building a profile from nothing. The ceiling is what this
+        # test is about, so the count is what it checks.
+        with pytest.raises(TrackerError, match="no issues"):
+            tracker.search(TicketQuery(project="a/b", limit=50))
+        # Ten pages, then one look at the repository itself: GitHub reports
+        # `has_issues` outright, so the refusal says it as a fact instead of
+        # guessing. That eleventh call happens only on this path, where ten
+        # have already been spent.
+        assert len(calls) == 11
 
     def test_labels_arrive_as_names(self):
         rows = [

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.syrian963/ticket-ai-mcp",
+  "title": "Ticket AI",
+  "description": "Measures tickets against the ones your team already shipped: sections, length, labels, duplicates.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/syrian963/Ticket-AI-MCP",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/syrian963/Ticket-AI-MCP",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "ticket-ai-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TICKET_AI_TRACKER",
+          "description": "Which tracker to read: gitlab, jira or github.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_PROJECT",
+          "description": "The project to measure. A GitLab path like acme/shop or its numeric id, a Jira project key like PROJ, or a GitHub owner/repo.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_GITLAB_URL",
+          "description": "Base URL of the GitLab instance, for example https://gitlab.example.com. Required when the tracker is gitlab.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_GITLAB_TOKEN",
+          "description": "GitLab personal access token. The read_api scope is enough; nothing here writes.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TICKET_AI_JIRA_URL",
+          "description": "Base URL of the Jira instance. Cloud or self-hosted Server and Data Center; which one is detected from the instance.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_JIRA_EMAIL",
+          "description": "Account email, for Jira Cloud's basic auth. Leave unset for a public board or for a Server personal access token.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_JIRA_TOKEN",
+          "description": "Jira API token from id.atlassian.com, or a Server personal access token on its own. Leave unset to read a public instance anonymously.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TICKET_AI_GITHUB_TOKEN",
+          "description": "GitHub token with read access to the repository's issues.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TICKET_AI_REPO",
+          "description": "Checkout to search when gathering context for a subject. Defaults to the working directory, which on a wrong guess produces confident nonsense - the report names the directory it searched.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_TICKET_LANGUAGE",
+          "description": "Force the language tickets should be written in, overriding what was measured in the corpus. Leave unset unless the board is mid-switch: a measurement beats a setting.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TICKET_AI_CACHE_DIR",
+          "description": "Where the learned profile is kept between runs. Defaults to .ticket-ai/ under the working directory.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

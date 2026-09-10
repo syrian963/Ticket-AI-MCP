@@ -41,7 +41,7 @@ from typing import Any
 import httpx
 
 from ..schemas import Comment, LinkedChange, Ticket, TicketDetail, TicketQuery
-from .base import TrackerError, register, utc
+from .base import TrackerError, rate_limit_message, register, utc
 
 # Jira has no single "closed" state: a workflow can end in Done, Closed,
 # Resolved, Cancelled or anything a project admin invented. The status
@@ -252,13 +252,50 @@ class JiraTracker:
         """
         try:
             response = self._client.get("/2/serverInfo")
-            if response.status_code < 400:
+            if response.is_redirect:
+                response = self._follow(response)
+            if response is not None and response.status_code < 400:
                 kind = (response.json() or {}).get("deploymentType", "")
                 if kind:
                     return "cloud" if kind.lower() == "cloud" else "server"
         except (httpx.HTTPError, ValueError):
             pass
         return "cloud" if ".atlassian.net" in self.url else "server"
+
+    def _follow(self, response: httpx.Response) -> httpx.Response | None:
+        """Deal with a Jira that lives somewhere other than where it answers.
+
+        A company keeps a vanity hostname - issues.example.com - and Atlassian
+        redirects it permanently to example.atlassian.net. Every browser
+        follows that and nobody notices, so it is the URL people paste. The
+        client does not follow redirects, so detection saw a 301, failed to
+        read JSON out of it, fell back to guessing by hostname, guessed Server
+        because the vanity name is not atlassian.net, and then asked a Cloud
+        instance for a Server endpoint. The error was "answered with something
+        that is not JSON", which sends someone to check their Jira version.
+
+        Where a credential is involved this refuses instead of following. A
+        token belongs to the host it was issued for, and forwarding it to
+        wherever a redirect points is how a credential ends up somewhere its
+        owner did not choose - so the message names the real URL and lets them
+        move it deliberately.
+        """
+        target = response.headers.get("location", "")
+        if not target.startswith("https://"):
+            return None
+        home = target.split("/rest/", 1)[0].rstrip("/")
+        if home == self.url:
+            return None
+        if not self._anonymous:
+            raise TrackerError(
+                f"{self.url} redirects to {home}. That is where this Jira really "
+                "lives - point TICKET_AI_JIRA_URL at it. The credential is not "
+                "sent to a host it was not configured for, so this is not done "
+                "automatically."
+            )
+        self.url = home
+        self._client.base_url = f"{home}/rest/api"
+        return self._client.get("/2/serverInfo")
 
     def search(self, query: TicketQuery) -> list[Ticket]:
         clauses = [f'project = "{query.project}"']
@@ -419,7 +456,7 @@ class JiraTracker:
                 )
             raise TrackerError("jira rejected the credentials. An API token is not a password.")
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} from {path}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, path))
         try:
             return response.json()
         except ValueError:

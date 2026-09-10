@@ -24,6 +24,7 @@ assistant that re-mines a tracker on every question will be turned off.
 
 from __future__ import annotations
 
+import functools
 import os
 from pathlib import Path
 
@@ -37,11 +38,20 @@ from .context import gather
 from .corpus import by_mining, from_keys
 from .i18n import ticket_language
 from .profile import Profile, build
-from .report import render_batch, render_context, render_profile, render_review
+from .report import (
+    render_batch,
+    render_context,
+    render_contrast,
+    render_gaps,
+    render_profile,
+    render_review,
+)
 from .review import EXPECT_RATE
 from .review import review as _review
 from .review import review_draft as _review_draft
 from .schemas import TicketQuery
+from .templates import compare as compare_templates
+from .templates import read as read_templates
 from .trackers import TrackerError, available
 
 INSTRUCTIONS = f"""Measures tickets against the way this team already writes them.
@@ -118,7 +128,37 @@ def _need(slug: str, project: str) -> Profile:
     return profile
 
 
+def answers(fn):
+    """Return a tracker's refusal as the answer instead of raising it.
+
+    The MCP layer treats an exception out of a tool as a crash: the client is
+    told "Error executing tool ticket_template" and the exception's own text
+    stays on the server. Measured against the real server, five of the eight
+    tools did exactly that the first time anyone called them - so the sentence
+    naming `learn_conventions`, and every message about a rate limit, a moved
+    repository or a board with issues switched off, was written carefully and
+    then thrown away before the person who needed it could read it.
+
+    A `TrackerError` is not a crash. It is the tool answering: this cannot be
+    done, and here is why. That belongs in the result, which is where
+    `house_style` had always put it and why it was the one tool whose message
+    ever reached anybody.
+
+    Anything else still raises. A real bug should look like one.
+    """
+
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except TrackerError as exc:
+            return str(exc)
+
+    return wrapper
+
+
 @server.tool(annotations=READ_ONLY)
+@answers
 async def learn_conventions(
     ctx: Context,
     project: str | None = None,
@@ -160,10 +200,18 @@ async def learn_conventions(
         return by_mining(client, cfg.project, sample=sample, want=keep, on_progress=on_progress)
 
     gathered = await anyio.to_thread.run_sync(work)
-    profile = build(gathered.exemplars, project=cfg.project, tracker=cfg.tracker)
+    profile = build(
+        gathered.exemplars,
+        project=cfg.project,
+        tracker=cfg.tracker,
+        contrast=gathered.contrast,
+        limits=gathered.limits,
+    )
     _path(cfg.slug).write_text(profile.to_json(), encoding="utf-8")
 
     text = render_profile(profile, gathered)
+    if gathered.contrast:
+        text += "\n" + render_contrast(gathered.contrast)
     if not gathered.enough:
         text += (
             "\n\nToo few exemplars to draw conclusions from. Ask the user to name a "
@@ -173,6 +221,7 @@ async def learn_conventions(
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
 async def house_style(project: str | None = None, tracker: str | None = None) -> str:
     """What this team's tickets look like: template, length, labels, habits.
 
@@ -190,6 +239,7 @@ async def house_style(project: str | None = None, tracker: str | None = None) ->
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
 async def ticket_template(project: str | None = None, tracker: str | None = None) -> str:
     """The skeleton to fill in when writing a new ticket here.
 
@@ -240,6 +290,39 @@ async def ticket_template(project: str | None = None, tracker: str | None = None
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
+async def template_gaps(
+    repo: str | None = None,
+    project: str | None = None,
+    tracker: str | None = None,
+) -> str:
+    """Compare the issue template this repository declares with the tickets it gets.
+
+    Reads `.github/ISSUE_TEMPLATE` or `.gitlab/issue_templates` from the
+    checkout and lines each field up against how often tickets actually carry
+    it. The gap is the finding, and it runs both ways:
+
+    - A **required field almost nobody fills in** is a form asking for
+      something people cannot easily supply. Say so: the cheap fix is to
+      change the form, not to nag the team.
+    - A **section most tickets carry that no form mentions** is a convention
+      the project grew and never wrote down. Adding it to the template is how
+      it survives the next person who joins.
+
+    Use this when asked how to improve a board rather than one ticket. It is
+    the only tool here that reads what the project said it wanted, instead of
+    only what it does.
+    """
+    cfg = settings(tracker, project)
+    profile = _need(cfg.slug, cfg.project)
+    root = Path(repo or os.environ.get("TICKET_AI_REPO") or Path.cwd())
+    declared = read_templates(root)
+    gaps, undeclared = compare_templates(declared, profile)
+    return render_gaps(declared, gaps, undeclared, profile.sample_size)
+
+
+@server.tool(annotations=READ_ONLY)
+@answers
 async def ticket_context(
     subject: str,
     repo: str | None = None,
@@ -276,6 +359,7 @@ async def ticket_context(
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
 async def review_draft(
     title: str,
     description: str,
@@ -300,6 +384,7 @@ async def review_draft(
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
 async def review_ticket(ticket: str, project: str | None = None, tracker: str | None = None) -> str:
     """Measure one ticket against the learned house style.
 
@@ -314,6 +399,7 @@ async def review_ticket(ticket: str, project: str | None = None, tracker: str | 
 
 
 @server.tool(annotations=READ_ONLY)
+@answers
 async def review_open_tickets(
     limit: int = 50,
     label: str | None = None,

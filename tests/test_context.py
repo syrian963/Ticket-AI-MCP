@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from conftest import make_detail, make_ticket
 
+from ticket_ai_mcp.codebase import _is_changelog
+from ticket_ai_mcp.codebase import _names_it as names_it
 from ticket_ai_mcp.codebase import search as search_code
 from ticket_ai_mcp.context import gather
 from ticket_ai_mcp.report import render_context
@@ -210,3 +212,152 @@ class TestGather:
         assert context.prior
         assert context.files == ()
         assert any("not a directory" in note for note in context.notes)
+
+
+class TestTheFileNamedAfterTheSubject:
+    """A plural in the filename should not cost it the name bonus.
+
+    Found against a real checkout of Flask. Asked about a "session cookie",
+    the search scored `src/flask/sessions.py` at 4.0 - the same as
+    `docs/templating.rst` - because the subject says `session` and the file
+    says `sessions`, so the name match never fired and the tie broke
+    alphabetically. The one file in the repository named after the subject was
+    not in the top ten.
+    """
+
+    def tree(self, tmp_path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "src/sessions.py").write_text(
+            "class SessionInterface:\n    def open_session(self):\n        ...\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "src/blueprints.py").write_text("class Blueprint:\n    ...\n", encoding="utf-8")
+        # A document that mentions the words and is about none of them, which
+        # is what a changelog or a tutorial is.
+        (tmp_path / "docs/templating.rst").write_text(
+            "The session and the cookie and the secure flag are all discussed here.\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_the_singular_subject_finds_the_plural_file(self, tmp_path):
+        hits = search_code(self.tree(tmp_path), "session cookie is not set when secure is on")
+        assert hits[0].path == "src/sessions.py"
+        assert "session" in hits[0].in_name
+
+    def test_a_plural_subject_finds_the_singular_file(self, tmp_path):
+        # Both directions, because a title is as likely to say "blueprints".
+        hits = search_code(self.tree(tmp_path), "blueprints ignore the url prefix")
+        assert hits[0].path == "src/blueprints.py"
+
+    def test_a_short_word_does_not_get_the_benefit(self, tmp_path):
+        # Four characters of stem, or `bus` matches `bu` and `class` matches
+        # `clas`. This is one exception for plurals, not a stemmer.
+        assert names_it("session", {"sessions"}) is True
+        assert names_it("sessions", {"session"}) is True
+        assert names_it("bus", {"bu"}) is False
+        assert names_it("abc", {"abcs"}) is False
+
+
+class TestAChangelogIsNotAnAnswer:
+    """A record of every change mentions every word the project has used.
+
+    Measured over six unrelated subjects on two real checkouts: `CHANGES.rst`
+    came back for five of them and `CHANGELOG.md` for five - not because it
+    was relevant five times, but because it is a concatenation of every
+    subject the project has ever had, and it was crowding out the file the
+    work lands in.
+    """
+
+    def tree(self, tmp_path):
+        """A source file the subject does not name, and a changelog that does.
+
+        Written this way on purpose. The first version of this test gave the
+        source file a matching *name*, which is worth four times a body match
+        - so it won with the fix and without it, and proved nothing. The case
+        that needs the weighting is the one where both files match the same
+        words in their contents and the changelog wins the tie on its path.
+        """
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src/handler.py").write_text(
+            "# the parser drops a trailing slash here\n", encoding="utf-8"
+        )
+        (tmp_path / "CHANGELOG.md").write_text(
+            "- the parser drops a trailing slash\n- unrelated cookie fix\n", encoding="utf-8"
+        )
+        return tmp_path
+
+    def test_the_source_file_wins(self, tmp_path):
+        hits = search_code(self.tree(tmp_path), "the parser drops a trailing slash")
+        assert hits[0].path == "src/handler.py"
+
+    def test_but_it_is_not_hidden(self, tmp_path):
+        # Halved, not excluded: "the changelog is missing an entry" is a real
+        # ticket and this is the file it is about.
+        paths = [h.path for h in search_code(self.tree(tmp_path), "changelog entry for the parser")]
+        assert "CHANGELOG.md" in paths
+
+    def test_the_names_it_recognises(self, tmp_path):
+        assert _is_changelog("CHANGES.rst")
+        assert _is_changelog("docs/CHANGELOG.md")
+        assert _is_changelog("HISTORY.txt")
+        assert _is_changelog("whats-new.md")
+        assert not _is_changelog("src/changes_view.py")
+        assert not _is_changelog("src/newsletter.py")
+
+
+class TestLengthIsNotRelevance:
+    """A long ticket contains every word by accident, not by aboutness.
+
+    `rank` used to divide by the subject's weight and nothing else, on the
+    argument that a long ticket containing every word is a better match rather
+    than a worse one. Measured over six unrelated subjects against 120 closed
+    tickets from home-assistant/core, the top match came back **longer than
+    83% of the pool on average**, and longer than 88% for four of the six.
+    With the length term it is 56% - about what you would expect if length
+    were not deciding.
+
+    The assertion below is deliberately the narrow one. "The shorter ticket
+    wins" is a preference this project has not earned; "the same handful of
+    matched words is worth less inside forty paragraphs than inside two" is
+    exactly what the length term does and all it claims.
+    """
+
+    SHARED = "Etikettendruck bricht beim Sammeldruck ab"
+
+    def pool(self):
+        # Identical overlap with the subject, identical titles' irrelevance,
+        # forty times the padding. Nothing but length is different, so nothing
+        # but length can explain a difference in score.
+        padding = (
+            " Wareneingang Inventur Kommissionierung Retoure Versand Nachschub "
+            "Umlagerung Bestandskorrektur Lagerplatz Charge"
+        ) * 20
+        return [
+            make_ticket("#1", title="Lager", description=self.SHARED),
+            make_ticket("#2", title="Lager", description=self.SHARED + padding),
+        ]
+
+    def test_the_same_words_are_worth_less_in_a_longer_ticket(self):
+        scores = {m.ticket.key: m.score for m in rank(self.SHARED, self.pool(), limit=2)}
+        assert scores["#1"] > scores.get("#2", 0.0)
+
+    def test_a_long_ticket_is_still_findable_when_it_is_the_answer(self):
+        # Discounted, not excluded: a subject that only the padded ticket
+        # covers still has to reach it.
+        keys = [m.ticket.key for m in rank("Inventur Kommissionierung Retoure", self.pool())]
+        assert keys[0] == "#2"
+
+
+class TestTheConnectiveTissueOfEveryBugReport:
+    def test_a_shared_after_is_not_a_relationship(self):
+        # Found on home-assistant/core: a ticket about a to-do trigger came
+        # back as the best match for a subject about an MQTT sensor, and the
+        # words they shared were "after" and its neighbours. Those are in
+        # every bug report ever written, which is the same reason "when",
+        # "then" and "should" were already dropped.
+        for word in ("after", "before", "again", "still", "always", "during", "while"):
+            assert word not in tokens(f"it broke {word} the restart")
+        # And the words that carry the subject survive.
+        assert "restart" in tokens("it broke after the restart")

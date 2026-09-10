@@ -64,6 +64,29 @@ _MESSAGES: dict[str, dict[str, dict[str, str]]] = {
             "fix": "Die Überschrift {heading!r} ergänzen und ausfüllen.",
         },
     },
+    # The same finding, when the two outcome groups were big enough to compare.
+    # One rate invites a shrug; two rates are an argument, so this variant is
+    # used whenever `contrast.py` had the evidence to support it.
+    "missing_section_contrast": {
+        "en": {
+            "what": "No {heading!r} section.",
+            "why": (
+                "{shipped} of the tickets that shipped have one, against {stalled} of "
+                "the ones that stalled - closed with nothing merged, or reopened, or "
+                "left waiting on questions."
+            ),
+            "fix": "Add the {heading!r} heading and fill it in.",
+        },
+        "de": {
+            "what": "Kein Abschnitt {heading!r}.",
+            "why": (
+                "{shipped} der umgesetzten Tickets haben einen, gegenüber {stalled} "
+                "der liegengebliebenen - ohne Merge geschlossen, wieder geöffnet oder "
+                "an Rückfragen hängengeblieben."
+            ),
+            "fix": "Die Überschrift {heading!r} ergänzen und ausfüllen.",
+        },
+    },
     "missing_conditional_section": {
         "en": {
             "what": "Has a {when!r} section but no {then!r}.",
@@ -200,6 +223,16 @@ def render(code: str, part: str, params: dict[str, Any], language: str | None = 
     entry = _MESSAGES.get(code)
     if not entry:
         return code
+    if code == "language_mismatch":
+        # `found` and `expected` arrive as codes. A reader wants a language.
+        params = {
+            **params,
+            **{
+                key: _part(f"lang.{params[key]}", lang)
+                for key in ("found", "expected")
+                if key in params
+            },
+        }
     template = entry.get(lang, entry.get(DEFAULT, {})).get(part) or entry.get(DEFAULT, {}).get(
         part, ""
     )
@@ -214,3 +247,192 @@ def render(code: str, part: str, params: dict[str, Any], language: str | None = 
 
 def codes() -> tuple[str, ...]:
     return tuple(sorted(_MESSAGES))
+
+
+# The caveats that travel with a profile, in both languages.
+#
+# These are separate from findings because they are about the *measurement*
+# rather than about one ticket: "built from four tickets, so treat every rate
+# as a hint". They were English string literals built in `profile.py`, which
+# put the most important sentences on a German page in English - the page whose
+# whole reason for existing is that a German team reads it.
+#
+# Same two rules as above: every message names its measurement, and both
+# languages carry the same numbers.
+_NOTES: dict[str, dict[str, str]] = {
+    "thin_sample": {
+        "en": (
+            "Built from {n} tickets. Every rate below moves by more than {points} "
+            "points if one ticket changes, so treat them as a hint rather than a rule."
+        ),
+        "de": (
+            "Aus {n} Tickets gebaut. Jede Rate unten verschiebt sich um mehr als "
+            "{points} Punkte, wenn ein Ticket anders ist - also eher ein Hinweis "
+            "als eine Regel."
+        ),
+    },
+    "no_template": {
+        "en": (
+            "No heading appears in two or more of these tickets: this team does not "
+            "seem to use a template, so nothing here can check for one."
+        ),
+        "de": (
+            "Keine Überschrift kommt in zwei oder mehr dieser Tickets vor: dieses "
+            "Team benutzt offenbar keine Vorlage, also kann hier auch nichts auf "
+            "eine geprüft werden."
+        ),
+    },
+    "no_exemplars": {
+        "en": "No ticket in the sample could be used as an exemplar.",
+        "de": "Kein Ticket aus der Stichprobe war als Beispiel brauchbar.",
+    },
+    "tracker_withheld": {
+        "en": (
+            "{host} did not serve {missing} - {why}. Rankings and the "
+            "shipped-against-stalled comparison are weaker without them."
+        ),
+        "de": (
+            "{host} hat {missing} nicht geliefert - {why}. Die Bewertung und der "
+            "Vergleich zwischen umgesetzten und liegengebliebenen Tickets sind "
+            "ohne sie schwächer."
+        ),
+    },
+}
+
+# The pieces the tracker_withheld sentence is assembled from. They are listed
+# here rather than in the adapter for the same reason the sentence is: an
+# adapter that returns prose can only return it in one language.
+_PARTS: dict[str, dict[str, str]] = {
+    "notes": {"en": "comments", "de": "Kommentare"},
+    "resource_state_events": {"en": "reopen history", "de": "die Wiedereröffnungen"},
+    "related_merge_requests": {"en": "linked merge requests", "de": "verknüpfte Merge Requests"},
+    "anonymous": {"en": "reading without a token", "de": "Lesen ohne Token"},
+    # Language names, because the finding used to interpolate the code: both
+    # languages read "Written in de." and "Auf de geschrieben.", which is not
+    # a sentence in either of them.
+    "lang.en": {"en": "English", "de": "Englisch"},
+    "lang.de": {"en": "German", "de": "Deutsch"},
+    "scope": {
+        "en": "the token's scope, or this GitLab version",
+        "de": "der Umfang des Tokens oder diese GitLab-Version",
+    },
+}
+
+
+def part(name: str, language: str | None = None) -> str:
+    """One noun out of a note, in the reader's language."""
+    entry = _PARTS.get(name)
+    if not entry:
+        return name
+    return entry.get(normalise(language)) or entry.get(DEFAULT, name)
+
+
+# `render` takes a parameter called `part`, which shadows the function above.
+# The alias is the smallest fix that keeps both names readable where they are.
+_part = part
+
+
+def render_note(code: str, params: dict[str, Any], language: str | None = None) -> str:
+    """One profile caveat, in one language.
+
+    Same forgiving behaviour as `render`: an unknown code or a missing
+    parameter produces an obviously wrong sentence rather than taking the
+    report down with it.
+    """
+    if code == "_literal":
+        # A sentence that was already finished when it got here: a caveat read
+        # back from a profile cached before notes became codes. It cannot be
+        # translated - nobody kept the parts - and showing it is better than
+        # dropping it.
+        return str(params.get("text", ""))
+    entry = _NOTES.get(code)
+    if not entry:
+        return code
+    lang = normalise(language)
+    if code == "tracker_withheld":
+        # The adapter hands over endpoint names and a reason to blame; the
+        # nouns and the joining comma are language, so they are made here.
+        params = {
+            **params,
+            "missing": ", ".join(part(name, lang) for name in params.get("parts", ())),
+            "why": part(params.get("why", ""), lang),
+        }
+    template = entry.get(lang) or entry.get(DEFAULT, "")
+    try:
+        return template.format(**params)
+    except (KeyError, IndexError):
+        return template
+
+
+def note_codes() -> tuple[str, ...]:
+    return tuple(sorted(_NOTES))
+
+
+# What a ticket got right, and the caveats a review carries. Same treatment as
+# findings and for the same reason: these were English prose built in
+# `review.py`, so a German page showed German findings, a German heading over
+# them, and then "has the Steps to reproduce section" underneath.
+#
+# The section names inside them stay in whatever language the team writes -
+# they are the team's own headings, not words to translate.
+_PASSED: dict[str, dict[str, str]] = {
+    "has_section": {
+        "en": "has the {heading} section",
+        "de": "hat den Abschnitt {heading}",
+    },
+    "has_pair": {
+        "en": "has {then} to go with {when}",
+        "de": "hat {then} passend zu {when}",
+    },
+    "length_normal": {
+        "en": "description length ({chars} characters) is in the normal range",
+        "de": "Beschreibungslänge ({chars} Zeichen) liegt im üblichen Bereich",
+    },
+    "labelled": {
+        "en": "labelled ({labels})",
+        "de": "mit Labels versehen ({labels})",
+    },
+    "has_list": {"en": "has a list", "de": "hat eine Liste"},
+    "has_checklist": {"en": "has a checklist", "de": "hat eine Checkliste"},
+    "has_code": {"en": "has a code block", "de": "hat einen Code-Block"},
+    "has_image": {"en": "has a screenshot", "de": "hat einen Screenshot"},
+    "has_cross_ref": {
+        "en": "links another ticket",
+        "de": "verweist auf ein anderes Ticket",
+    },
+    "no_profile": {
+        "en": (
+            "There is no profile to compare against - no exemplar tickets were "
+            "found. Nothing below this line would mean anything."
+        ),
+        "de": (
+            "Es gibt kein Profil zum Vergleichen - es wurden keine Beispieltickets "
+            "gefunden. Nichts unterhalb dieser Zeile hat eine Bedeutung."
+        ),
+    },
+    "nothing_applied": {
+        "en": (
+            "No check applied to this ticket: the exemplar tickets have no "
+            "convention consistent enough to hold anyone to. That is a finding "
+            "about the board, not a pass for this ticket."
+        ),
+        "de": (
+            "Keine Prüfung war auf dieses Ticket anwendbar: die Beispieltickets "
+            "haben keine Konvention, die konsequent genug wäre, um jemanden daran "
+            "zu messen. Das ist ein Befund über das Board, nicht ein Bestehen "
+            "für dieses Ticket."
+        ),
+    },
+}
+
+
+def render_passed(code: str, params: dict[str, Any], language: str | None = None) -> str:
+    """One "already right" line or caveat, in one language."""
+    entry = _PASSED.get(code)
+    if not entry:
+        return code
+    template = entry.get(normalise(language)) or entry.get(DEFAULT, "")
+    try:
+        return template.format(**params)
+    except (KeyError, IndexError):
+        return template

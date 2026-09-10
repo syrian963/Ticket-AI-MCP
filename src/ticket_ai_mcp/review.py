@@ -22,7 +22,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
+from . import messages
 from .profile import Profile
 from .schemas import Ticket
 from .textstats import language, normalise_heading, shape
@@ -40,16 +42,48 @@ _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 class Finding:
     """One way this ticket departs from the corpus.
 
-    `why` always names the measurement. Without it a reader has no way to tell
-    a house rule from the tool's taste, and no way to push back when the corpus
-    is wrong.
+    **Data, not prose.** A finding carries a code and the measurements behind
+    it; the sentence is built when it is displayed, in whatever language the
+    reader asked for. Building the sentence here would mean one language
+    forever, and a German page reading *Übereinstimmung mit dem Hausstil*
+    followed by *The ticket has no description at all* is not carrying a number
+    carefully - it is half-translated the other way round.
+
+    `what`, `why` and `fix` render English, which is what every caller that has
+    not asked for a language gets. `localised` is the same three in any
+    supported one, and both go through the single catalogue in `messages.py`,
+    so a translation cannot quietly say something the English does not.
+
+    `why` always names the measurement. Without it a reader cannot tell a house
+    rule from the tool's taste, and cannot push back when the corpus is wrong.
     """
 
     code: str
     severity: str
-    what: str
-    why: str
-    fix: str
+    params: dict[str, Any] = field(default_factory=dict)
+
+    def _text(self, part: str, language: str | None = None) -> str:
+        return messages.render(self.code, part, self.params, language)
+
+    @property
+    def what(self) -> str:
+        return self._text("what")
+
+    @property
+    def why(self) -> str:
+        return self._text("why")
+
+    @property
+    def fix(self) -> str:
+        return self._text("fix")
+
+    def localised(self, language: str | None = None) -> tuple[str, str, str]:
+        """what, why and fix, in one language."""
+        return (
+            self._text("what", language),
+            self._text("why", language),
+            self._text("fix", language),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +101,40 @@ class Review:
     ticket_url: str
     alignment: float | None
     findings: tuple[Finding, ...]
-    passed: tuple[str, ...] = ()
-    caveats: tuple[str, ...] = field(default_factory=tuple)
+    # What the ticket already got right, and what to distrust about the
+    # comparison - both as a code and its measurements, the way findings are.
+    # They were English prose, so a German review showed German findings and
+    # then "has the Steps to reproduce section" under a German heading.
+    passed_codes: tuple[tuple[str, dict[str, Any]], ...] = ()
+    caveat_codes: tuple[tuple[str, dict[str, Any]], ...] = ()
     checks_run: int = 0
+
+    @property
+    def passed(self) -> tuple[str, ...]:
+        return self.localised_passed()
+
+    @property
+    def caveats(self) -> tuple[str, ...]:
+        return self.localised_caveats()
+
+    def localised_passed(self, language: str | None = None) -> tuple[str, ...]:
+        from .messages import render_passed
+
+        return tuple(render_passed(code, params, language) for code, params in self.passed_codes)
+
+    def localised_caveats(self, language: str | None = None) -> tuple[str, ...]:
+        from .messages import render_note, render_passed
+
+        out = []
+        for code, params in self.caveat_codes:
+            # A caveat is either one of this module's own or a note carried
+            # over from the profile; both catalogues answer with the code
+            # itself when they do not know it, so trying both is safe.
+            rendered = render_passed(code, params, language)
+            if rendered == code:
+                rendered = render_note(code, params, language)
+            out.append(rendered)
+        return tuple(out)
 
 
 def _pct(rate: float) -> str:
@@ -118,8 +183,8 @@ def review(ticket: Ticket, profile: Profile) -> Review:
     """Compare one ticket with the profile built from the team's own tickets."""
     body = shape(ticket.description)
     findings: list[Finding] = []
-    passed: list[str] = []
-    caveats: list[str] = list(profile.notes)
+    passed: list[tuple[str, dict[str, Any]]] = []
+    caveats: list[tuple[str, dict[str, Any]]] = list(profile.note_codes)
 
     # Every check that *applied* is recorded here, whether it passed or not.
     # Scoring only over the checks that failed is what produced a board where
@@ -138,10 +203,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             ticket_url=ticket.url,
             alignment=None,
             findings=(),
-            caveats=(
-                "There is no profile to compare against - no exemplar tickets were found. "
-                "Nothing below this line would mean anything.",
-            ),
+            caveat_codes=(("no_profile", {}),),
         )
 
     if body.is_empty:
@@ -149,13 +211,11 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             Finding(
                 code="empty_description",
                 severity="high",
-                what="The ticket has no description at all.",
-                why=(
-                    f"Every one of the {profile.sample_size} tickets that shipped in "
-                    f"{profile.project} had one, with a median of {round(profile.chars_median)} "
-                    "characters."
-                ),
-                fix="Write the description before anything else here is worth checking.",
+                params={
+                    "total": profile.sample_size,
+                    "project": profile.project,
+                    "median": round(profile.chars_median),
+                },
             )
         )
         # Everything downstream measures a description. There isn't one.
@@ -164,7 +224,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             ticket_url=ticket.url,
             alignment=0.0,
             findings=tuple(findings),
-            caveats=tuple(caveats),
+            caveat_codes=tuple(caveats),
             checks_run=1,
         )
 
@@ -176,18 +236,35 @@ def review(ticket: Ticket, profile: Profile) -> Review:
         severity = "high" if section.rate >= STRONG_RATE else "medium"
         record(severity, section.key in present)
         if section.key in present:
-            passed.append(f"has the {section.heading} section")
+            passed.append(("has_section", {"heading": section.heading}))
+            continue
+        # Where the shipped-against-stalled comparison had enough of both to be
+        # worth quoting, quote it: two rates are an argument and one is a rate.
+        contrast = profile.discriminative.get(section.key)
+        if contrast:
+            shipped_rate, stalled_rate = contrast
+            findings.append(
+                Finding(
+                    code="missing_section_contrast",
+                    severity=severity,
+                    params={
+                        "heading": section.heading,
+                        "shipped": _pct(shipped_rate),
+                        "stalled": _pct(stalled_rate),
+                    },
+                )
+            )
             continue
         findings.append(
             Finding(
                 code="missing_section",
                 severity=severity,
-                what=f"No {section.heading!r} section.",
-                why=(
-                    f"{section.count} of the {profile.sample_size} exemplar tickets "
-                    f"({_pct(section.rate)}) have one."
-                ),
-                fix=f"Add the {section.heading!r} heading and fill it in.",
+                params={
+                    "heading": section.heading,
+                    "count": section.count,
+                    "total": profile.sample_size,
+                    "pct": _pct(section.rate),
+                },
             )
         )
 
@@ -199,6 +276,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
     # has all of them satisfies each pair twice. Scored twice that is fine -
     # it is genuinely two checks - but reported twice it reads as a stutter.
     said: set[frozenset[str]] = set()
+    missing: set[str] = set()
     for rule in profile.conditionals:
         if rule.when not in present or rule.rate < EXPECT_RATE:
             continue
@@ -207,20 +285,28 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             pair = frozenset((rule.when, rule.then))
             if pair not in said:
                 said.add(pair)
-                passed.append(f"has {rule.then_heading} to go with {rule.when_heading}")
+                passed.append(("has_pair", {"then": rule.then_heading, "when": rule.when_heading}))
             continue
+        # One missing section, one finding. A ticket that skipped the
+        # reproduction on a board where five other sections all imply it used
+        # to collect five findings that asked for the same paragraph. The
+        # rules are sorted strongest first, so the first one to name a section
+        # is the one with the best evidence behind it.
+        if rule.then in missing:
+            continue
+        missing.add(rule.then)
         findings.append(
             Finding(
                 code="missing_conditional_section",
                 severity="medium",
-                what=f"Has a {rule.when_heading!r} section but no {rule.then_heading!r}.",
-                why=(
-                    f"{rule.count} of the {rule.of} exemplar tickets with a "
-                    f"{rule.when_heading!r} section ({_pct(rule.rate)}) also have "
-                    f"{rule.then_heading!r} - against {_pct(rule.baseline)} of tickets overall. "
-                    "The two go together on this board."
-                ),
-                fix=f"Add the {rule.then_heading!r} section.",
+                params={
+                    "when": rule.when_heading,
+                    "then": rule.then_heading,
+                    "count": rule.count,
+                    "of": rule.of,
+                    "pct": _pct(rule.rate),
+                    "baseline": _pct(rule.baseline),
+                },
             )
         )
 
@@ -231,17 +317,15 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             Finding(
                 code="short_description",
                 severity="medium",
-                what=f"The description is {body.chars} characters.",
-                why=(
-                    f"The shortest quarter of tickets that shipped here start at "
-                    f"{round(profile.chars_p25)} characters; the median is "
-                    f"{round(profile.chars_median)}."
-                ),
-                fix="Say what should happen, and how anyone will know it did.",
+                params={
+                    "chars": body.chars,
+                    "p25": round(profile.chars_p25),
+                    "median": round(profile.chars_median),
+                },
             )
         )
     else:
-        passed.append(f"description length ({body.chars} characters) is in the normal range")
+        passed.append(("length_normal", {"chars": body.chars}))
 
     # --- labels --------------------------------------------------------
     if profile.label_rate >= EXPECT_RATE:
@@ -251,18 +335,15 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             Finding(
                 code="no_labels",
                 severity="medium",
-                what="The ticket has no labels.",
-                why=f"{_pct(profile.label_rate)} of the exemplars are labelled.",
-                fix=(
-                    "Add the usual ones: "
-                    + ", ".join(label for label, _ in profile.common_labels[:5])
-                    if profile.common_labels
-                    else "Add the labels this project sorts by."
-                ),
+                params={
+                    "pct": _pct(profile.label_rate),
+                    "suggestions": ", ".join(label for label, _ in profile.common_labels[:5])
+                    or "whatever this project sorts by",
+                },
             )
         )
     elif ticket.labels:
-        passed.append(f"labelled ({', '.join(ticket.labels[:4])})")
+        passed.append(("labelled", {"labels": ", ".join(ticket.labels[:4])}))
 
     # A scoped label group that almost every ticket carries is usually the one
     # the board columns are built from, so a ticket missing it falls off the
@@ -285,51 +366,28 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             Finding(
                 code="missing_label_group",
                 severity="medium",
-                what=f"No {group}:: label.",
-                why=f"Roughly {_pct(min(group_rate, 1.0))} of the exemplars carry one.",
-                fix=f"Set the {group}:: label so the board picks this up.",
+                params={"group": group, "pct": _pct(min(group_rate, 1.0))},
             )
         )
 
     # --- habits --------------------------------------------------------
-    for code, rate, has, what, fix in (
-        (
-            "no_checklist",
-            profile.checkbox_rate,
-            body.checkboxes > 0,
-            "No checklist.",
-            "Break the work into checkboxes the way the other tickets do.",
-        ),
-        (
-            "no_screenshot",
-            profile.image_rate,
-            body.images > 0,
-            "No screenshot or attachment.",
-            "Attach the screen this is about.",
-        ),
+    for code, rate, has, done in (
+        ("no_checklist", profile.checkbox_rate, body.checkboxes > 0, "has_checklist"),
+        ("no_screenshot", profile.image_rate, body.images > 0, "has_image"),
         (
             "no_cross_reference",
             profile.cross_ref_rate,
             bool(body.ticket_refs),
-            "Nothing linked to another ticket or change.",
-            "Link the ticket this follows from, if there is one.",
+            "has_cross_ref",
         ),
     ):
         if rate < STRONG_RATE:
             continue
         record("low", has)
         if has:
-            passed.append(what.rstrip(".").replace("No ", "has a ").lower())
+            passed.append((done, {}))
             continue
-        findings.append(
-            Finding(
-                code=code,
-                severity="low",
-                what=what,
-                why=f"{_pct(rate)} of the exemplars have one.",
-                fix=fix,
-            )
-        )
+        findings.append(Finding(code=code, severity="low", params={"pct": _pct(rate)}))
 
     # --- title ---------------------------------------------------------
     for prefix, rate in profile.title_prefixes:
@@ -342,9 +400,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
                 Finding(
                     code="title_prefix",
                     severity="low",
-                    what=f"The title does not start with a marker like {prefix!r}.",
-                    why=f"{_pct(rate)} of the exemplar titles do.",
-                    fix=f"Prefix the title the way the others are prefixed ({prefix}).",
+                    params={"prefix": prefix, "pct": _pct(rate)},
                 )
             )
         break
@@ -358,9 +414,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             Finding(
                 code="language_mismatch",
                 severity="medium",
-                what=f"Written in {ticket_language}.",
-                why=f"The exemplar tickets in this project are in {profile.language}.",
-                fix="Match the language the rest of the board is in.",
+                params={"found": ticket_language, "expected": profile.language},
             )
         )
 
@@ -373,11 +427,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
         # Nothing was measurable. Say that, rather than dressing an absence of
         # evidence up as a perfect score.
         alignment = None
-        caveats.append(
-            "No check applied to this ticket: the exemplar tickets have no convention "
-            "consistent enough to hold anyone to. That is a finding about the board, "
-            "not a pass for this ticket."
-        )
+        caveats.append(("nothing_applied", {}))
     else:
         earned = sum(weight for weight, ok in checks if ok)
         alignment = round(earned / total, 3)
@@ -387,7 +437,7 @@ def review(ticket: Ticket, profile: Profile) -> Review:
         ticket_url=ticket.url,
         alignment=alignment,
         findings=tuple(findings),
-        passed=tuple(passed),
-        caveats=tuple(caveats),
+        passed_codes=tuple(passed),
+        caveat_codes=tuple(caveats),
         checks_run=len(checks),
     )

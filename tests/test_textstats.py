@@ -101,3 +101,46 @@ class TestQuantile:
 
     def test_empty(self):
         assert quantile([], 0.5) == 0.0
+
+
+class TestATemplatesOwnInstructions:
+    """HTML comments are what the form said, not what the reporter wrote.
+
+    Found on inkscape/inkscape, driving the MCP tools against the live board:
+    the house style listed a section called `<!-- Example file` carried by 30%
+    of tickets. Their template ends a comment with a colon on its own line, and
+    a colon on its own line is one of the four heading shapes. Nobody can see
+    that section - it is invisible in the rendered ticket - so the team is
+    being credited with a convention that does not exist, and held to a length
+    that includes every word of the instructions they were handed.
+    """
+
+    REAL = (
+        "Operating System: Ubuntu\n\n"
+        "<!-- Example file:\n"
+        "Attach a sample file (or files) highlighting the issue. -->\n\n"
+        "## Steps to reproduce\nOpen it."
+    )
+
+    def test_a_comment_is_not_a_section(self):
+        assert shape(self.REAL).headings == ("Steps to reproduce",)
+
+    def test_and_its_words_are_not_the_teams_words(self):
+        # The instructions ran to about sixty characters on their own.
+        assert shape(self.REAL).chars < 70
+
+    def test_a_comment_inside_a_fence_is_content(self):
+        # A ticket showing HTML is showing HTML, and the fence says so.
+        # No colon-terminated line outside the fence, or the fixture sprouts a
+        # heading of its own and the assertion stops being about comments.
+        fenced = "This markup breaks it.\n\n```html\n<!-- keep me -->\n<div>x</div>\n```\n\n## Problem\nIt breaks."
+        s = shape(fenced)
+        assert s.code_blocks == 1
+        assert s.headings == ("Problem",)
+
+    def test_an_unclosed_comment_swallows_the_rest(self):
+        # Which is exactly what it does on the board, too: somebody deleted the
+        # closing marker and the ticket renders as nothing. Measuring it as
+        # nothing is the honest answer, not a special case.
+        broken = "Real text.\n<!-- someone deleted the closing marker\n## Not a heading any more"
+        assert shape(broken).headings == ()

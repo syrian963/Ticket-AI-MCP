@@ -10,12 +10,14 @@ count over a real sample, the tool is back to giving generic advice.
 
 from __future__ import annotations
 
+import json
 import re
+import time
 
 from conftest import GOOD_BODY, make_detail, make_ticket
 
-from ticket_ai_mcp.mining import pick
-from ticket_ai_mcp.profile import Profile, build, clusters
+from ticket_ai_mcp.mining import pick, score
+from ticket_ai_mcp.profile import MAX_TRIGGERS, Profile, build, clusters
 from ticket_ai_mcp.report import render_profile, render_review
 from ticket_ai_mcp.review import review, review_draft
 
@@ -220,6 +222,53 @@ class TestConditionalConventions:
         taken, _ = pick(details, want=20)
         p = build(taken, project="acme/shop", tracker="gitlab")
         assert [c for c in p.conditionals if c.then == "abnahme"] == []
+
+    def test_the_bar_rises_with_the_number_of_pairs_tested(self):
+        # Every ordered pair of sections is a hypothesis. Measured against
+        # random data, a pair with no association clears a flat 0.25 lift 8%
+        # of the time - about fourteen invented rules on a board with fourteen
+        # sections, which is why sixteen of thirty real boards came back
+        # holding exactly the twelve the display cap allowed.
+        from ticket_ai_mcp.profile import MIN_LIFT, required_lift
+
+        assert required_lift(2) == MIN_LIFT
+        assert required_lift(6) == MIN_LIFT
+        assert required_lift(180) > MIN_LIFT
+        # Monotonic, and capped so a very wide board is not unanswerable.
+        assert required_lift(12) < required_lift(48) < required_lift(180)
+        assert required_lift(10_000) <= 0.55
+
+    def test_a_wide_board_does_not_fill_up_with_coincidences(self):
+        # Sixteen sections scattered at random across thirty tickets: 240
+        # ordered pairs and nothing real between any of them. Averaged over
+        # several boards, because a single seed proves nothing either way -
+        # the first version of this test passed with the flat threshold too,
+        # which meant it was testing nothing.
+        import random
+
+        # Low prevalence is the point. A section in five of thirty tickets
+        # passes the old trigger and its conditional rate swings twenty points
+        # on one ticket, which is exactly where invented rules come from - and
+        # why sections carried by half the board never produced them.
+        totals = []
+        for seed in range(6):
+            random.seed(seed)
+            details = []
+            for i in range(30):
+                chosen = [f"## Abschnitt {j}\n" for j in range(16) if random.random() < 0.2]
+                body = "".join(chosen) + ("Fliesstext ueber das Problem. " * 20)
+                details.append(
+                    make_detail(make_ticket(f"#{i}", description=body, author=f"dev{i % 6}"))
+                )
+            taken, _ = pick(details, want=30)
+            p = build(taken, project="acme/wide", tracker="gitlab")
+            totals.append(len([c for c in p.conditionals if c.rate >= 0.6]))
+
+        average = sum(totals) / len(totals)
+        # Under the flat threshold this runs into double figures. Sixteen of
+        # thirty real boards came back holding exactly the twelve the display
+        # cap allowed, which is what a cap doing the selecting looks like.
+        assert average <= 3, f"{average:.1f} coincidences per board on random data: {totals}"
 
     def test_a_rare_trigger_is_not_a_rule(self):
         # Two tickets agreeing with each other is a coincidence with a percent
@@ -433,3 +482,252 @@ class TestReview:
             assert finding.severity in ("high", "medium", "low")
         severities = [f.severity for f in result.findings]
         assert severities == sorted(severities, key=lambda s: ["high", "medium", "low"].index(s))
+
+
+class TestLimitsTravelWithTheProfile:
+    """A profile built from a board that was only half readable says so.
+
+    The run that builds it prints the caveat once; every later review reads the
+    cached profile and would print nothing. A profile is a claim about how a
+    team writes, and one built without comments is a weaker claim - which has
+    to be attached to the claim, not to the run.
+    """
+
+    def limited(self):
+        from ticket_ai_mcp.mining import score
+
+        detail = make_detail(make_ticket("#1", description=GOOD_BODY))
+        return build(
+            [score(detail)],
+            project="acme/shop",
+            tracker="gitlab",
+            limits=(
+                (
+                    "tracker_withheld",
+                    {"host": "gitlab.com", "parts": ["notes"], "why": "anonymous"},
+                ),
+            ),
+        )
+
+    def test_the_note_is_on_the_profile(self):
+        assert any("did not serve comments" in n for n in self.limited().notes)
+
+    def test_and_it_can_be_read_back_in_german(self):
+        # The whole reason a note is a code and not a sentence: this page has
+        # a German mode, and a caveat is the last thing that should arrive in
+        # English on it.
+        german = self.limited().localised_notes("de")
+        assert any("nicht geliefert" in n and "Kommentare" in n for n in german)
+
+    def test_it_survives_being_cached_and_read_back(self):
+        from ticket_ai_mcp.profile import Profile
+
+        again = Profile.from_json(self.limited().to_json())
+        assert any("did not serve comments" in n for n in again.notes)
+
+    def test_an_empty_corpus_keeps_it_too(self):
+        # The case that needs it most: nothing came back, and why nothing came
+        # back is the whole answer.
+        empty = build(
+            [],
+            project="acme/shop",
+            tracker="gitlab",
+            limits=(
+                (
+                    "tracker_withheld",
+                    {"host": "gitlab.com", "parts": ["notes"], "why": "anonymous"},
+                ),
+            ),
+        )
+        assert any("did not serve comments" in n for n in empty.notes)
+
+
+class TestARigidTemplateStaysWhole:
+    """Six sections that always appear together are one block, not twelve rules.
+
+    Measured on rollup/rollup: thirty rules cleared the threshold, which is
+    every ordered pair of six sections. Truncating the list to twelve before
+    clustering handed the cluster finder a graph missing half its edges - and
+    a block is found by pairs that hold in *both* directions, so cutting one
+    direction of a pair destroys the evidence for the block.
+    """
+
+    def corpus(self, headings: list[str], n: int = 10):
+        """Half the board writes the block, half writes prose.
+
+        A block that every ticket has is not conditional on anything: the
+        baseline equals the conditional rate and no pair clears the threshold.
+        The interesting board, and the one rollup/rollup turned out to be, is
+        the one with two ticket shapes - the sections imply each other, and the
+        board-wide rate of 50% hides all of it.
+        """
+        from ticket_ai_mcp.mining import score
+
+        body = "\n\n".join(f"## {h}\nsomething about {h} here to give it length" for h in headings)
+        plain = "A paragraph of prose with no heading in it at all, long enough to count."
+        return [
+            score(make_detail(make_ticket(f"#{i}", description=body))) for i in range(1, n + 1)
+        ] + [score(make_detail(make_ticket(f"#p{i}", description=plain))) for i in range(1, n + 1)]
+
+    def test_every_pair_of_a_rigid_block_survives_the_measurement(self):
+        headings = ["Problem", "Ziel", "Umfang", "Kriterien", "Risiken", "Test"]
+        profile = build(self.corpus(headings), project="acme/shop", tracker="gitlab")
+        # Six sections, both directions: thirty ordered pairs, none of them
+        # distinguishable from the others.
+        assert len(profile.conditionals) == len(headings) * (len(headings) - 1)
+
+    def test_and_the_block_is_recognised_as_one(self):
+        headings = ["Problem", "Ziel", "Umfang", "Kriterien", "Risiken", "Test"]
+        profile = build(self.corpus(headings), project="acme/shop", tracker="gitlab")
+        blocks = clusters(profile.conditionals)
+        assert len(blocks) == 1
+        assert len(blocks[0]) == len(headings)
+
+    def test_the_report_prints_the_block_once_instead_of_thirty_rules(self):
+        headings = ["Problem", "Ziel", "Umfang", "Kriterien", "Risiken", "Test"]
+        profile = build(self.corpus(headings), project="acme/shop", tracker="gitlab")
+        text = render_profile(profile)
+        assert text.count("of the time") == 0
+        assert text.count("appear as a block") == 1
+
+    def test_one_missing_section_is_one_finding_not_five(self):
+        # The ticket under review has the block minus its last section. Every
+        # other section implies the missing one, so before the fix this asked
+        # for the same paragraph five times.
+        headings = ["Problem", "Ziel", "Umfang", "Kriterien", "Risiken", "Test"]
+        profile = build(self.corpus(headings), project="acme/shop", tracker="gitlab")
+        body = "\n\n".join(
+            f"## {h}\nsomething about {h} here to give it length" for h in headings[:-1]
+        )
+        found = review(make_ticket("#99", description=body, state="open"), profile)
+        asked = [f for f in found.findings if f.code == "missing_conditional_section"]
+        assert len(asked) == 1
+        assert asked[0].params["then"] == "Test"
+
+
+class TestTheReportSaysWhyTheCorpusIsSmall:
+    """A corpus of two out of fifty needs its reason printed beside it.
+
+    Found on Hibernate's HSEARCH board: the recent closed tickets are almost
+    all dependency bumps with no description, so 48 of 50 were excluded and
+    the report said "built from 2 tickets" and stopped. From the outside that
+    is indistinguishable from a filter that is too strict, and the tool had
+    the reason in hand the whole time.
+    """
+
+    def gathered(self, keep: int, drop: int):
+        from ticket_ai_mcp.corpus import by_mining
+
+        good = [make_detail(make_ticket(f"#{i}", description=GOOD_BODY)) for i in range(keep)]
+        thin = [make_detail(make_ticket(f"#t{i}", description="too short")) for i in range(drop)]
+
+        class Board:
+            name = "test"
+
+            def search(self, query):
+                return [d.ticket for d in good + thin]
+
+            def fetch(self, project, key):  # pragma: no cover - unused
+                raise NotImplementedError
+
+            def detail(self, ticket):
+                return next(d for d in good + thin if d.ticket.key == ticket.key)
+
+        return by_mining(Board(), "acme/shop", sample=99, want=99)
+
+    def test_the_reasons_are_grouped_and_counted(self):
+        gathered = self.gathered(keep=6, drop=20)
+        profile = build(gathered.exemplars, project="acme/shop", tracker="gitlab")
+        text = render_profile(profile, gathered)
+        assert "## Left out" in text
+        assert "20 of 26" in text
+
+    def test_an_empty_corpus_says_why_too(self):
+        # The branch that needs it most, and the one that used to return
+        # before the reasons were reached: nothing measured, no explanation.
+        gathered = self.gathered(keep=0, drop=12)
+        profile = build(gathered.exemplars, project="acme/shop", tracker="gitlab")
+        text = render_profile(profile, gathered)
+        assert "Nothing could be measured" in text
+        assert "12 of 12" in text
+
+
+class TestAProfileCachedBeforeThisChange:
+    """The cache on disk outlives the code that wrote it.
+
+    A profile is cached next to somebody's checkout and nobody asked it to
+    expire. Notes used to be finished English sentences under a `notes` key;
+    they are codes now, and a loader that had not been told would have raised
+    TypeError on the old key - turning a background cache read into a crash on
+    a machine where nothing changed but the version.
+    """
+
+    OLD = json.dumps(
+        {
+            "project": "acme/shop",
+            "tracker": "gitlab",
+            "built_at": "2026-01-01T00:00:00+00:00",
+            "sample_size": 3,
+            "exemplar_keys": ["#1", "#2", "#3"],
+            "notes": ["Built from 3 tickets, so treat every rate as a hint."],
+        }
+    )
+
+    def test_it_still_loads(self):
+        again = Profile.from_json(self.OLD)
+        assert again.sample_size == 3
+
+    def test_and_the_caveat_survives_verbatim(self):
+        # It cannot be translated - nobody kept the parts - but a caveat that
+        # disappears on upgrade is the failure this whole change was about.
+        again = Profile.from_json(self.OLD)
+        assert again.notes == ("Built from 3 tickets, so treat every rate as a hint.",)
+        assert again.localised_notes("de") == again.notes
+
+    def test_and_it_round_trips_forward(self):
+        again = Profile.from_json(Profile.from_json(self.OLD).to_json())
+        assert again.notes == ("Built from 3 tickets, so treat every rate as a hint.",)
+
+
+class TestAPathologicalCorpusCannotHangIt:
+    """Every ordered pair of triggers is examined, and nothing bounded the count.
+
+    `learn_conventions` is an MCP call somebody is waiting on, and the work
+    grew with the square of the number of recurring headings: measured over a
+    corpus of twelve tickets, 500 headings cost 0.3 seconds, 2000 cost 3.5,
+    3000 cost ten, and it kept going.
+
+    Not a fuzzing curiosity - a ticket template that generates headings, or a
+    board that pastes a table of contents into every ticket, gets there
+    without anybody trying.
+    """
+
+    def corpus(self, headings: int, tickets: int = 12):
+        body = "".join(f"## H{i}\nsomething here\n" for i in range(headings))
+        return [score(make_detail(make_ticket(f"#{i}", description=body))) for i in range(tickets)]
+
+    def test_two_thousand_headings_finish_promptly(self):
+        """The number and the budget are both measured, not guessed.
+
+        A/B against the same corpus: with the ceiling, 2000 recurring headings
+        cost 0.17 seconds; without it, 3.32. A second sits well above the one
+        and well below the other.
+
+        The first version of this test used a thousand headings and a
+        two-second budget - and a thousand costs 0.94 seconds uncapped, so it
+        passed with the ceiling and without it, and proved nothing.
+        """
+        started = time.monotonic()
+        build(self.corpus(2000), project="acme/shop", tracker="gitlab")
+        assert time.monotonic() - started < 1.0
+
+    def test_the_cap_is_far_above_any_real_board(self):
+        # Measured across the fleet: the widest board produced eleven triggers
+        # and the one with the most sections had twenty-five. If this ever has
+        # to come down, that is the number to check it against.
+        assert MAX_TRIGGERS >= 50
+
+    def test_a_normal_board_is_untouched_by_it(self):
+        # Ten headings, well under the ceiling: every pair is still examined.
+        profile = build(self.corpus(10, tickets=20), project="acme/shop", tracker="gitlab")
+        assert len(profile.sections) == 10

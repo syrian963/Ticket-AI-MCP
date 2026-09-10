@@ -1,6 +1,6 @@
 [project]
 name = "ticket-ai-mcp"
-version = "0.0.1"
+version = "0.1.0"
 description = "MCP server and CLI that learns what a good ticket looks like in your tracker, then measures new tickets against it. GitLab, Jira, GitHub."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -23,7 +23,7 @@ from urllib.parse import quote
 import httpx
 
 from ..schemas import Comment, LinkedChange, Ticket, TicketDetail, TicketQuery
-from .base import TrackerError, paginate, register, utc
+from .base import TrackerError, paginate, rate_limit_message, register, utc
 
 
 @register
@@ -40,15 +40,24 @@ class GitLabTracker:
     ) -> None:
         if not url:
             raise TrackerError("gitlab needs a base url, for example https://gitlab.example.com")
-        if not token:
-            raise TrackerError(
-                "gitlab needs a personal access token with the read_api scope. "
-                "Set TICKET_AI_GITLAB_TOKEN."
-            )
         self.url = url.rstrip("/")
+        # A token is not required. Every public project on gitlab.com and on
+        # most self-managed instances answers the issues API anonymously, and
+        # refusing to start without one shut the tool out of the open-source
+        # projects it is most useful to learn from. What anonymity costs is a
+        # worse 404: GitLab hides a private project rather than refusing it, so
+        # the not-found message says so when there is no token to blame.
+        self.anonymous = not token
+        # Sub-resources this instance would not serve. Recorded rather than
+        # shrugged off: reading gitlab.com anonymously gets the issues and the
+        # merge requests but not the comments, and a corpus with no comments
+        # cannot tell a ticket that stalled from one a bot closed. The profile
+        # is still worth building; the reader has to be told what is missing
+        # from it.
+        self.unavailable: set[str] = set()
         self._client = client or httpx.Client(
             base_url=f"{self.url}/api/v4",
-            headers={"PRIVATE-TOKEN": token},
+            headers={"PRIVATE-TOKEN": token} if token else {},
             timeout=timeout,
         )
 
@@ -69,24 +78,47 @@ class GitLabTracker:
             params["updated_after"] = query.updated_after.isoformat()
         if query.text:
             params["search"] = query.text
-        rows = paginate(
-            self._client,
-            f"/projects/{self._project_ref(query.project)}/issues",
-            params,
-            limit=query.limit,
-        )
+        try:
+            rows = paginate(
+                self._client,
+                f"/projects/{self._project_ref(query.project)}/issues",
+                params,
+                limit=query.limit,
+            )
+        except TrackerError as exc:
+            if "404" in str(exc):
+                raise TrackerError(self._not_found(query.project)) from None
+            raise
         return [self._to_ticket(row, query.project) for row in rows]
+
+    def _access_hint(self) -> str:
+        """What to check when GitLab says something is not there.
+
+        GitLab hides a project it will not show you rather than refusing it, so
+        anonymously a private project and a typo are the same 404. Which two
+        things to check depends on whether we are signed in at all.
+        """
+        if self.anonymous:
+            return (
+                "Check the project path - a group and a subgroup both count. If it "
+                "is private, reading it needs a personal access token with the "
+                "read_api scope in TICKET_AI_GITLAB_TOKEN."
+            )
+        return (
+            "Check the project path - a group and a subgroup both count - and that "
+            "the token has the read_api scope and can see the project."
+        )
+
+    def _not_found(self, project: str) -> str:
+        return f"no project {project} on {self.url}. {self._access_hint()}"
 
     def fetch(self, project: str, key: str) -> Ticket:
         iid = key.lstrip("#")
         response = self._client.get(f"/projects/{self._project_ref(project)}/issues/{iid}")
         if response.status_code == 404:
-            raise TrackerError(
-                f"no issue {key} in {project}. Check the project path and that the "
-                "token can see the project."
-            )
+            raise TrackerError(f"no issue {key} in {project}. {self._access_hint()}")
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} fetching {key}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, f"issue {key}"))
         return self._to_ticket(response.json(), project)
 
     def detail(self, ticket: Ticket) -> TicketDetail:
@@ -166,17 +198,50 @@ class GitLabTracker:
         Not every endpoint exists on every GitLab version or plan, and a
         missing `resource_state_events` should degrade the ranking, not abort
         the run.
+
+        401 belongs in that list and it took a live board to find out.
+        gitlab.com serves the issues of a public project to anyone but answers
+        401 Unauthorized for that same issue's `/notes` - so an anonymous run
+        listed forty tickets and then failed to read the history of every one
+        of them. A sub-resource we are not allowed to see is a sub-resource we
+        do without - but it is written down. Doing without comments silently is
+        how a profile ends up describing a board it could only half read.
         """
         try:
             response = self._client.get(path, params={**params, "per_page": 100})
         except httpx.HTTPError as exc:
             raise TrackerError(f"could not reach {path}: {exc}") from exc
-        if response.status_code in (403, 404):
+        if response.status_code in (401, 403, 404):
+            self.unavailable.add(path.rsplit("/", 1)[-1])
             return []
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} from {path}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, path))
         body = response.json()
         return body if isinstance(body, list) else []
+
+    # What a caller has to know before believing the numbers. Named after the
+    # thing it describes rather than the endpoint, because "resource_state_events"
+    # is not a sentence anyone outside this file should have to read.
+    def degradations(self) -> tuple[tuple[str, dict[str, Any]], ...]:
+        """What this instance would not serve, as a note the caller can render.
+
+        A code and its parts rather than a sentence, because the sentence has
+        to exist in two languages and an adapter is the wrong place to keep
+        either of them. The words live in `messages.py`; what belongs here is
+        which endpoints answered and whether there was a token to blame.
+        """
+        if not self.unavailable:
+            return ()
+        return (
+            (
+                "tracker_withheld",
+                {
+                    "host": self.url,
+                    "parts": sorted(self.unavailable),
+                    "why": "anonymous" if self.anonymous else "scope",
+                },
+            ),
+        )
 
     def _to_ticket(self, row: dict[str, Any], project: str) -> Ticket:
         iid = row.get("iid")

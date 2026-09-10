@@ -96,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
             self.profile,
             labels=labels,
         )
-        self._json(_review_payload(result))
+        self._json(_review_payload(result, language=self.language))
 
     # --- handlers ------------------------------------------------------
 
@@ -107,7 +107,10 @@ class Handler(BaseHTTPRequestHandler):
             "tracker": p.tracker,
             "sample_size": p.sample_size,
             "language": p.language,
-            "notes": list(p.notes),
+            # The caveats decide how much of the rest of this page to believe,
+            # so they follow the page's language rather than staying English
+            # under a German heading.
+            "notes": list(p.localised_notes(self.language)),
             "sections": [asdict(s) for s in p.sections],
             "blocks": [
                 {
@@ -149,7 +152,10 @@ class Handler(BaseHTTPRequestHandler):
         tickets = tracker.search(
             TicketQuery(project=self.settings.project, state="open", limit=100)
         )
-        rows = [_review_payload(_review(t, self.profile), url=t.url) for t in tickets]
+        rows = [
+            _review_payload(_review(t, self.profile), url=t.url, language=self.language)
+            for t in tickets
+        ]
         rows.sort(key=lambda r: (r["alignment"] is None, r["alignment"] or 0.0, r["key"]))
         return {"tickets": rows}
 
@@ -195,17 +201,34 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
 
-def _review_payload(result, *, url: str = "") -> dict[str, Any]:
+def _review_payload(result, *, url: str = "", language: str | None = None) -> dict[str, Any]:
+    """A review as JSON, with the findings rendered in the reader's language.
+
+    `asdict` will not do here, and that is the point: a finding is a code and
+    its measurements, and the sentence is built on the way out. It is why a
+    German board can now show German findings rather than German chrome around
+    English prose.
+    """
+    findings = [
+        dict(
+            zip(
+                ("what", "why", "fix"),
+                f.localised(language),
+                strict=True,
+            ),
+            code=f.code,
+            severity=f.severity,
+        )
+        for f in sorted(result.findings, key=lambda f: _severity_order(f.severity))
+    ]
     return {
         "key": result.ticket_key,
         "url": url or result.ticket_url,
         "alignment": result.alignment,
         "checks_run": result.checks_run,
-        "findings": [
-            asdict(f) for f in sorted(result.findings, key=lambda f: _severity_order(f.severity))
-        ],
-        "passed": list(result.passed),
-        "caveats": list(result.caveats),
+        "findings": findings,
+        "passed": list(result.localised_passed(language)),
+        "caveats": list(result.localised_caveats(language)),
     }
 
 
@@ -251,6 +274,13 @@ def page(language: str) -> str:
             "style.blocks",
             "style.length",
             "style.habits",
+            "habit.labelled",
+            "habit.assigned",
+            "habit.list",
+            "habit.checklist",
+            "habit.code",
+            "habit.screenshot",
+            "habit.cross_ref",
             "style.labels",
             "style.language",
             "style.measured",
@@ -390,6 +420,11 @@ button:disabled { opacity: .55; cursor: default; }
 .finding .fix { font-size: 13px; margin-top: 5px; }
 .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
        color: var(--muted); }
+/* A caveat is a sentence and has to read like one. These used to carry the
+   chip style above, which shouts a whole paragraph in capitals - and they are
+   the sentences that say how much of the rest of the page to believe. */
+.caveat { font-size: 12px; color: var(--muted); line-height: 1.5;
+          margin: 10px 0 0; }
 .ok { color: var(--ok); }
 .note { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line);
         margin-top: 26px; padding-top: 12px; }
@@ -529,7 +564,8 @@ function renderStyle(d) {
 
   h.push(`<h2>${esc(S["style.habits"])}</h2><div class="rows">`);
   for (const [k, v] of Object.entries(d.habits)) {
-    h.push(`<div class="row"><span class="name">${esc(k.replace("_", " "))}</span>` +
+    const label = S["habit." + k] || k.replace("_", " ");
+    h.push(`<div class="row"><span class="name">${esc(label)}</span>` +
       bar(v) + `<span class="num">${pct(v)}</span></div>`);
   }
   h.push("</div>");
@@ -546,7 +582,7 @@ function renderStyle(d) {
   if (d.language) {
     h.push(`<h2>${esc(S["style.language"])}</h2><p>${esc(d.language.toUpperCase())}</p>`);
   }
-  for (const n of d.notes) h.push(`<p class="tag">${esc(n)}</p>`);
+  for (const n of d.notes) h.push(`<p class="caveat">${esc(n)}</p>`);
   box.innerHTML = h.join("");
 }
 
@@ -557,7 +593,7 @@ function renderReview(r) {
     : `<span class="score">${pct(r.alignment)}` +
       `<small>${esc(S["review.checks"].replace("{n}", r.checks_run))}</small></span>`;
   h.push(`<h2>${esc(S["review.alignment"])}</h2><p>${score}</p>`);
-  for (const c of r.caveats) h.push(`<p class="tag">${esc(c)}</p>`);
+  for (const c of r.caveats) h.push(`<p class="caveat">${esc(c)}</p>`);
 
   if (!r.findings.length) {
     h.push(`<p class="ok">${esc(S["review.clean"])}</p>`);

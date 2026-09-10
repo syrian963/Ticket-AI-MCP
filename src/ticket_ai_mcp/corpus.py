@@ -27,6 +27,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from .contrast import Contrast
+from .contrast import build as build_contrast
 from .mining import Exemplar, Rejected, pick
 from .schemas import TicketDetail, TicketQuery
 from .trackers import Tracker, TrackerError
@@ -46,6 +48,14 @@ class Gathered:
     considered: int
     source: str
     errors: tuple[str, ...] = ()
+    # Not the same thing as an error, and counting them together made a board
+    # with one unreadable ticket and a board the instance half-serves look
+    # alike. An error is about one ticket; a limit is about the whole run.
+    limits: tuple[tuple[str, dict], ...] = ()
+    # What separated the tickets that shipped from the ones that stalled.
+    # Only mining produces one: a caller who named their own exemplars gave no
+    # negative class to compare against, and inventing one would be a guess.
+    contrast: Contrast | None = None
 
     @property
     def enough(self) -> bool:
@@ -65,6 +75,19 @@ def _detail(tracker: Tracker, ticket, errors: list[str]) -> TicketDetail | None:
     except TrackerError as exc:
         errors.append(f"{ticket.key}: {exc}")
         return None
+
+
+def _degradations(tracker: Tracker) -> tuple[tuple[str, dict], ...]:
+    """What the tracker could not read, if it keeps track.
+
+    Optional, like changed_files: an adapter that always gets everything has
+    nothing to say here. The one that does is GitLab read anonymously, which
+    serves an issue and its merge requests but not its comments - and a corpus
+    with no comments cannot tell a ticket that stalled from one a bot closed.
+    Degrading is the right behaviour; degrading quietly is not.
+    """
+    report = getattr(tracker, "degradations", None)
+    return tuple(report()) if callable(report) else ()
 
 
 def from_keys(
@@ -100,6 +123,7 @@ def from_keys(
         considered=len(keys),
         source="tickets you named",
         errors=tuple(errors),
+        limits=_degradations(tracker),
     )
 
 
@@ -140,11 +164,26 @@ def by_mining(
         if detail:
             details.append(detail)
 
+    if tickets and not details:
+        # Every ticket listed, none readable. This is not a quiet project and
+        # it is not a strict filter - it is one failure repeated, and the
+        # profile built on top of it is a page of zeroes that reads like an
+        # answer. Found on a public GitLab board read anonymously: the issues
+        # listed fine and every history behind them came back 401.
+        raise TrackerError(
+            f"{len(tickets)} closed tickets were listed in {project} and none of "
+            f"them could be read. The first reason was - {errors[0]}"
+        )
+
     exemplars, rejected = pick(details, want=want)
+    # Every ticket read is compared, not only the ones kept as exemplars: the
+    # rejected half is exactly the negative class this needs.
     return Gathered(
         exemplars=exemplars,
         rejected=rejected,
         considered=len(tickets),
         source=f"the last {len(tickets)} closed tickets",
         errors=tuple(errors),
+        limits=_degradations(tracker),
+        contrast=build_contrast(details),
     )

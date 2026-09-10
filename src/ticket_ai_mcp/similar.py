@@ -128,6 +128,26 @@ _STOP = {
     "that",
     "these",
     "those",
+    # Time and degree words. Added after measuring: on home-assistant/core a
+    # ticket about a todo trigger came back as the best match for "MQTT sensor
+    # keeps its old state after a restart", sharing nothing with it but
+    # "after" and its neighbours here. These are the connective tissue of
+    # every bug report ever written - present in most tickets, evidence about
+    # none of them - which is the same reason "when", "then" and "should" are
+    # already above.
+    "after",
+    "before",
+    "again",
+    "still",
+    "always",
+    "never",
+    "during",
+    "while",
+    "about",
+    "into",
+    "over",
+    "under",
+    "very",
     "there",
     "here",
     "also",
@@ -201,6 +221,22 @@ TITLE_BOOST = 1.4
 # a full match keeps its score, a one-in-three match keeps two thirds of it.
 MIN_COVERAGE_FACTOR = 0.5
 
+# How much a ticket's own length is allowed to discount its score, the way
+# BM25 does it: 0 ignores length entirely, 1 divides by it in full.
+#
+# This started at 0 - not as a constant, but as a comment arguing that a long
+# ticket containing every word is a better match rather than a worse one, and
+# that dividing by its length would punish it for being thorough. Measured on
+# 120 closed tickets from home-assistant/core over six unrelated subjects, the
+# top match was **longer than 83% of the pool on average** and longer than 88%
+# for four of the six. One ticket came back first for two subjects that share
+# no vocabulary at all.
+#
+# A ticket long enough to contain every word contains them by accident. That
+# is the same pathology as a changelog in the file search, and it has the same
+# standard answer.
+LENGTH_PENALTY = 0.6
+
 # Results below this fraction of the best one are noise sitting under a
 # heading that says "related". Five results of which four are wrong is worse
 # than one result, because it teaches people to skim the section.
@@ -216,6 +252,7 @@ def rank(subject: str, tickets: list[Ticket], *, limit: int = 5) -> list[Match]:
     documents = [tokens(f"{t.title} {t.description}") for t in tickets]
     weight = _weights(documents)
     subject_weight = sum(weight.get(word, 0.0) for word in wanted) or 1.0
+    average_length = max(sum(len(d) for d in documents) / max(len(documents), 1), 1.0)
 
     matches: list[Match] = []
     for ticket, doc in zip(tickets, documents, strict=True):
@@ -228,10 +265,12 @@ def rank(subject: str, tickets: list[Ticket], *, limit: int = 5) -> list[Match]:
         score = sum(
             weight.get(word, 0.0) * (TITLE_BOOST if word in title else 1.0) for word in overlap
         )
-        # Normalised by the subject, not by the ticket: a long ticket that
-        # happens to contain every word is a better match, not a worse one,
-        # and dividing by its length would punish it for being thorough.
         score /= subject_weight
+        # And discounted by how much longer this ticket is than the typical
+        # one on the board. See `LENGTH_PENALTY`: without it the ranking was
+        # being done by length.
+        length = max(len(doc), 1)
+        score /= 1 - LENGTH_PENALTY + LENGTH_PENALTY * (length / average_length)
         coverage = len(overlap) / len(wanted)
         score *= MIN_COVERAGE_FACTOR + (1 - MIN_COVERAGE_FACTOR) * coverage
 

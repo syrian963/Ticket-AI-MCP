@@ -79,39 +79,95 @@ habit. It is also repetitive - the second criterion runs to fifty words and
 says one thing three ways - which is what a 3B model does, and no amount of
 measurement fixes it.
 
-## Two bugs this found
+## What the prompt has to spell out
 
-Neither showed up on a single ticket. Both needed a batch.
+Three things a small model gets wrong unless told, all found by running a batch
+rather than a single ticket:
 
-**The model invented a `Labels` section.** The prompt listed the project's
-labels without saying what they were for, so several drafts came back with
-labels written into the body. Labels are tracker metadata. The system prompt
-now says so, and it went from four runs in seven to one.
+**Labels are metadata, not a section.** Given a list of the project's labels
+with no explanation, several drafts wrote a `Labels` heading into the body. The
+system prompt now says what they are for.
 
-**Feedback leaked into the ticket.** One draft contained the sentence *"Anyone
-will know it did when they see..."* - which is the wording of a finding's
-`fix`, not anything about the bug. The revision prompt handed the model a draft
-and a list of corrections in one flat block, and a 3B model could not tell
-which was the document. The draft is now fenced and the instructions say
-outright that the feedback is not text to reuse. Zero leaks in seven runs
-afterwards.
+**Feedback is not text to reuse.** Handed a draft and a list of corrections in
+one flat block, a 3B model copied a correction's wording into the ticket. The
+draft is fenced now and the instructions say so outright.
 
-The German runs went from 67% to 100% on the back of those two fixes.
+Between them those two took the German runs from 67% to 100%.
 
-## What it does not do well
+**A board with no template needs saying so.** Three of the forty-three boards in
+the fleet use no recurring heading at all, and one more has a heading that is
+not common enough to ask for. Their prompt used to read "Sections to use, and
+why each one:" followed by "(no recurring sections)" — a heading promising a
+list and then no list — while the system prompt separately said to use exactly
+the sections it was given. The prompt now says *this team has no section every
+ticket uses, write prose paragraphs with no headings at all*, and rule 2 names
+that case rather than leaving "exactly none" to interpretation.
 
-- **It invents causes.** One uv draft explained the bug as "uv lock and uv sync
-  are using different versions of the uv library", which is made up. The system
-  prompt forbids exactly this and a 3B model does it anyway. Read what comes
-  back before posting it.
-- **It writes short.** Before the prompt was tightened, every draft came in at
-  350–500 characters against corpus medians near 1000. It is better now and
-  still the most common finding.
+Checked against llama3.2:3b on two real boards, same run:
+
+| board | template | headings written |
+|---|---|---|
+| Apache KAFKA | none measured | 0 |
+| home-assistant/core | 10 sections | exactly those 10, in order |
+
+
+## Writing German on an English board
+
+The case the two language settings exist for: a team that writes its tickets in
+German on a board whose template headings are English. Driven end to end
+against Inkscape's board with the ticket language forced to German, through
+llama3.2:3b.
+
+**Rule 1 and rule 2 were telling the model opposite things.** Rule 1 said
+*write in German — every heading and every sentence*; rule 2 said *use exactly
+the sections you are given, with those headings*. This model kept the English
+headings, which is right. A model that obeyed rule 1 instead would translate
+`What happened?` into a section the team does not have, and then every section
+check would fail on a draft that was actually fine. Rule 1 now exempts the
+given headings and says why.
+
+**The title came back inside the body.** Rule 5 says to write the description
+only; the first run opened with the ticket title underlined in `=`, the second
+with it in bold. The body goes into the description field, directly under that
+same title, so a copy of it would sit in every ticket this tool writes. A first
+line that *is* the title is now dropped — matched on the same normalisation the
+headings use, so bold, hashes, case and punctuation do not save it. A first
+line that says anything else is the model writing, and it stays.
+
+After both: prose in German, headings in the team's English, findings rendered
+in German, alignment 73% with two real findings.
+
+## A pattern that was measured and not built
+
+The same run produced a heading style the tool does not recognise:
+
+    Version info
+    ------------
+
+That is a heading in every markdown renderer and in none of this tool's four
+patterns, and the obvious move is to add a fifth. Counted first, across seven
+boards and 210 tickets: **23 apparent matches, 22 of them a code fence followed
+by a line of dashes, and one more of the same.** Zero real ones.
+
+So it is not built. `---` is also a horizontal rule, a table border and a YAML
+fence, and a pattern that fires only on those is a pattern that only ever
+produces false findings. The four that exist are there because teams were
+measured using them.
+
+## What to expect of a small model
+
+- **It writes short.** The most common remaining finding, and the reason the
+  prompt names a character target.
+- **It will describe software it has imagined** if it does not know the real
+  thing — a plausible reproduction for a UI that does not exist. Read a draft
+  before posting it; that is what `--fail-under` and the printed review are
+  for.
 - **The revision pass is one round.** A second fixes mechanical misses; a third
   mostly rewords.
 
-None of this is a reason not to use a small model. It is the reason the draft
-is measured afterwards, and the reason `--fail-under` exists.
+The structure is handled by measurement either way. What a bigger model buys is
+content you have to check less. See
+[what-it-produces.md](what-it-produces.md) for the other end of that scale.
 
 ## Where a bigger model helps
 

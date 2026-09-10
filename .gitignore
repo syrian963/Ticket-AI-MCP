@@ -9,3 +9,8 @@ build/
 .coverage
 htmlcov/
 .ticket-ai/
+
+# What tests/fleet.py writes where it is run. A record of one afternoon's API
+# calls against somebody else's boards - useful to read, not something to
+# carry in the repository.
+fleet.json

@@ -30,6 +30,29 @@ from dataclasses import dataclass
 # else. A stack trace pasted into a ticket is not six bullet points.
 _FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 _INLINE_CODE = re.compile(r"`[^`\n]+`")
+# An issue template's own instructions. Invisible in the rendered ticket, so
+# not part of what the team wrote. An unterminated one - somebody deleted the
+# closing marker - swallows the rest of the description, which is what the
+# ticket looks like on the board too.
+_HTML_COMMENT = re.compile(r"<!--.*?(?:-->|\Z)", re.DOTALL)
+
+
+def _outside_code(text: str, pattern: re.Pattern[str]) -> str:
+    """Remove what `pattern` matches, but leave fenced code alone.
+
+    Splitting on the fences rather than matching around them: a pattern that
+    tries to say "not inside a fence" in one regex is a pattern nobody can
+    read, and this is two lines.
+    """
+    out: list[str] = []
+    last = 0
+    for fence in _FENCE.finditer(text):
+        out.append(pattern.sub("", text[last : fence.start()]))
+        out.append(fence.group(0))
+        last = fence.end()
+    out.append(pattern.sub("", text[last:]))
+    return "".join(out)
+
 
 _MD_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$", re.MULTILINE)
 # A whole line that is only bold text is a heading in every team's hands, even
@@ -119,8 +142,20 @@ def headings(text: str) -> tuple[str, ...]:
 
 
 def shape(text: str) -> Shape:
-    """Measure one description."""
-    raw = text or ""
+    """Measure one description.
+
+    HTML comments come out first, and outside code only. They are the
+    instructions an issue template leaves behind - invisible in the rendered
+    ticket, and therefore not part of what the team writes. Left in, they get
+    measured twice over: `<!-- Example file:` alone on a line is a colon-line
+    heading, so 30% of one board's tickets were credited with a section nobody
+    can see, and every character of every instruction counted toward the length
+    the team is held to.
+
+    Inside a fence they stay, because there they are content: a ticket showing
+    HTML is showing HTML.
+    """
+    raw = _outside_code(text or "", _HTML_COMMENT)
     code_blocks = len(_FENCE.findall(raw))
     body = _FENCE.sub("\n", raw)
     prose = _INLINE_CODE.sub(" ", body)

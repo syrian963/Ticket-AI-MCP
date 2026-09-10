@@ -48,6 +48,20 @@ jobs:
         # down a percent at a time until it means nothing.
         run: uv run pytest --cov=ticket_ai_mcp --cov-report=term-missing --cov-fail-under=80
 
+  # `uv run` in the source tree proves the source tree works. It says nothing
+  # about whether the wheel carries every module or whether the entry points
+  # resolve outside the project - which is exactly what a first release gets
+  # wrong.
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - run: uv run --with twine twine check dist/*
+      - name: The wheel has to work on its own
+        run: bash install_check.sh
+
   # The suite never touches a network, and it has to stay that way: a test
   # that quietly depends on a live tracker fails for whoever forks this.
   offline:

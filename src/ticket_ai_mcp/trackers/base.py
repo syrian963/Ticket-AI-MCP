@@ -118,6 +118,46 @@ def utc(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def rate_limit_message(response: httpx.Response, url: str) -> str:
+    """Turn an HTTP failure into the sentence that helps.
+
+    A rate limit is not a fault and it is not a configuration mistake - it is
+    a wait. It arrives as a 403 or 429 looking exactly like a permission
+    problem, and mining a few hundred tickets reaches one often enough that
+    "403 Forbidden" sends people to check a token that was never wrong.
+
+    Both GitHub and GitLab say when the window resets; that number is the
+    whole answer, so it is what gets reported.
+    """
+    status = response.status_code
+    headers = response.headers
+    remaining = headers.get("x-ratelimit-remaining")
+    retry_after = headers.get("retry-after")
+    reset = headers.get("x-ratelimit-reset") or headers.get("ratelimit-reset")
+
+    limited = status == 429 or (status == 403 and remaining == "0")
+    if not limited and status == 403 and "rate limit" in response.text.lower():
+        limited = True
+
+    if limited:
+        when = ""
+        if retry_after and retry_after.isdigit():
+            when = f" Try again in about {round(int(retry_after) / 60)} minutes."
+        elif reset and reset.isdigit():
+            from datetime import datetime
+
+            seconds = int(reset) - int(datetime.now(UTC).timestamp())
+            if seconds > 0:
+                when = f" The window resets in about {max(1, round(seconds / 60))} minutes."
+        return (
+            f"The tracker is rate limiting: {status} on {url}."
+            f"{when} Nothing is wrong with the token."
+            " Mining reads the history of every ticket, so a large --sample can"
+            " reach a limit; a smaller one, or a wait, is the fix."
+        )
+    return f"{status} from {url}: {response.text[:200]}"
+
+
 _NEXT_LINK = re.compile(r'<([^>]+)>\s*;\s*rel="next"')
 
 
@@ -164,10 +204,30 @@ def walk(
         else:
             response = client.get(url)
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} from {url}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, url))
+
         batch = response.json()
         if not isinstance(batch, list):
-            raise TrackerError(f"expected a list from {url}, got {type(batch).__name__}")
+            # A collection that answers with an object is telling you
+            # something, and "expected a list" throws it away. The case that
+            # found this: a repository had been transferred, so GitHub
+            # answered 301 with a body naming the new location - which is a
+            # fixable configuration problem, not a parsing failure.
+            detail = ""
+            if isinstance(batch, dict):
+                message = batch.get("message") or ""
+                moved = batch.get("url") or ""
+                if response.status_code in (301, 302, 307, 308) or "moved" in message.lower():
+                    raise TrackerError(
+                        f"{url} has moved. GitHub says: {message or 'Moved Permanently'}. "
+                        "The project was probably renamed or transferred - point "
+                        "TICKET_AI_PROJECT at its current owner/repo."
+                        + (f" It now lives at {moved}." if moved else "")
+                    )
+                detail = f": {message}" if message else f": {list(batch)[:5]}"
+            raise TrackerError(
+                f"expected a list of items from {url}, got {type(batch).__name__}{detail}"
+            )
         pages += 1
         yield batch
 

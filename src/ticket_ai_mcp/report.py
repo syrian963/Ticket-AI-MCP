@@ -14,14 +14,41 @@ came from will not scroll.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from .context import Context
 from .corpus import Gathered
 from .profile import Profile, clusters
 from .review import Review
 
+# How many loose conditional rules a report prints. A reader who has read a
+# dozen has the idea; the rest are in the profile for the reviewer to use.
+SHOW_CONDITIONALS = 12
+
 
 def _pct(rate: float) -> str:
     return f"{round(rate * 100)}%"
+
+
+def _left_out(gathered: Gathered | None) -> list[str]:
+    """Why the corpus is the size it is.
+
+    The reasons were being collected and then dropped on the floor, which
+    mattered most exactly where a reader needs them: a Hibernate board came
+    back "built from 2 tickets" with no hint that the other 48 were dependency
+    bumps carrying no description at all. Two tickets is a fine reason to
+    distrust a profile, and a reader who is not told why cannot tell a strict
+    filter from a quiet board.
+    """
+    if not gathered or not gathered.rejected:
+        return []
+    reasons = Counter(r.reason.split(" - ")[0] for r in gathered.rejected)
+    lines = ["## Left out", ""]
+    lines += [
+        f"- {count} of {gathered.considered}: {reason}" for reason, count in reasons.most_common(5)
+    ]
+    lines.append("")
+    return lines
 
 
 def render_profile(profile: Profile, gathered: Gathered | None = None) -> str:
@@ -36,8 +63,15 @@ def render_profile(profile: Profile, gathered: Gathered | None = None) -> str:
     ]
 
     if profile.sample_size == 0:
+        # The one report where the reason is the entire content. "No ticket in
+        # the sample could be used as an exemplar" over thirty considered
+        # tickets reads like a broken tool; "29 of 30: description is under 80
+        # characters" reads like a board of dependency bumps, which is what it
+        # was. This branch used to return before the reasons were printed.
         lines += ["Nothing could be measured.", ""]
         lines += [f"- {note}" for note in profile.notes]
+        lines.append("")
+        lines += _left_out(gathered)
         return "\n".join(lines)
 
     if profile.sections:
@@ -67,9 +101,15 @@ def render_profile(profile: Profile, gathered: Gathered | None = None) -> str:
         for block in blocks:
             names = ", ".join(f"**{name}**" for name in block)
             lines.append(f"- these appear as a block: {names}")
-        for rule in strong:
-            if rule.when_heading in in_block and rule.then_heading in in_block:
-                continue
+        # Truncation belongs here rather than in the measurement. A board whose
+        # sections all imply each other produces one line above and does not
+        # need thirty below it; a board that does not is worth a dozen.
+        loose = [
+            rule
+            for rule in strong
+            if not (rule.when_heading in in_block and rule.then_heading in in_block)
+        ]
+        for rule in loose[:SHOW_CONDITIONALS]:
             lines.append(
                 f"- a ticket with **{rule.when_heading}** has **{rule.then_heading}** "
                 f"{rule.count}/{rule.of} of the time ({_pct(rule.rate)}), "
@@ -122,9 +162,138 @@ def render_profile(profile: Profile, gathered: Gathered | None = None) -> str:
         "",
     ]
 
-    if gathered and gathered.errors:
+    lines += _left_out(gathered)
+
+    if gathered and (gathered.errors or gathered.limits):
         lines += ["## Could not read", ""]
+        lines += [f"- {e}" for e in gathered.limits]
         lines += [f"- {e}" for e in gathered.errors[:10]]
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_contrast(contrast) -> str:
+    """What separated the tickets that shipped from the ones that stalled.
+
+    Ordered by the size of the gap, because the gap is the claim. A rate on
+    its own invites a shrug; a rate next to the rate for tickets that did not
+    get built is an argument.
+    """
+    if not contrast.usable:
+        lines = ["## Shipped against stalled", ""]
+        lines += [f"{note}" for note in contrast.notes]
+        return "\n".join(lines) + "\n"
+
+    lines = [
+        "## Shipped against stalled",
+        "",
+        f"{contrast.shipped} tickets shipped cleanly - a change merged, no reopens, "
+        f"no run of clarifying questions. {contrast.stalled} stalled. The split is "
+        "on what happened to them, never on how they were written, so the "
+        "difference below is evidence rather than arithmetic.",
+        "",
+    ]
+    helps = [s for s in contrast.signals if s.helps]
+    hurts = [s for s in contrast.signals if not s.helps]
+
+    if helps:
+        lines += ["| Present in the ones that shipped | Shipped | Stalled |", "|---|---|---|"]
+        for s in helps[:10]:
+            lines.append(f"| {s.label} | {_pct(s.shipped_rate)} | {_pct(s.stalled_rate)} |")
+        lines.append("")
+    if hurts:
+        lines += [
+            "More common on the ones that stalled:",
+            "",
+        ]
+        lines += [
+            f"- {s.label} - {_pct(s.stalled_rate)} of stalled, {_pct(s.shipped_rate)} of shipped"
+            for s in hurts[:6]
+        ]
+        lines += [
+            "",
+            "Worth reading twice before acting on. A feature commoner among the "
+            "tickets that stalled is as likely to be a symptom as a cause - hard "
+            "problems attract long descriptions.",
+            "",
+        ]
+    lines += [f"{note}" for note in contrast.notes]
+    return "\n".join(lines) + "\n"
+
+
+def render_gaps(declared, gaps, undeclared, sample: int) -> str:
+    """The form the project declares, against the tickets it actually gets.
+
+    The gap is the finding, in both directions. A required field almost nobody
+    fills in is a form asking for something people cannot supply - that is a
+    fix to the form, not a discipline problem. A heading most tickets carry
+    that no form mentions is a convention the project grew and never wrote
+    down, and it is the first thing to add.
+    """
+    if not declared.files:
+        # From the list the search actually uses. Written out by hand here
+        # once, and the copy had lost the leading dots on both paths - so the
+        # one message whose entire job is to say where to put the file sent
+        # people to two directories that cannot exist.
+        from .templates import SEARCH
+
+        return (
+            "No issue template found in the checkout. Looked in "
+            + ", ".join(f"`{p}`" for p in SEARCH)
+            + ". Without one the measured profile is the only contract there is.\n"
+        )
+
+    lines = [
+        "# Declared, and practised",
+        "",
+        f"From {', '.join('`' + f + '`' for f in declared.files)}, "
+        f"against {sample} tickets that shipped.",
+        "",
+        "| | Field | Filled in |",
+        "|---|---|---|",
+    ]
+    for gap in sorted(gaps, key=lambda g: g.rate):
+        mark = "**required**" if gap.required else "optional"
+        lines.append(f"| {mark} | {gap.label} | {_pct(gap.rate)} |")
+    lines.append("")
+
+    ignored = [g for g in gaps if g.required and g.is_ignored]
+    if ignored:
+        lines += [
+            "## Asked for, and mostly not supplied",
+            "",
+        ]
+        # Named by file, because a project usually has more than one form and
+        # this is measured against one corpus. On home-assistant/core the task
+        # form requires a `Description` that no bug ticket carries: true, and
+        # unreadable until you can see it came from a form those tickets never
+        # used.
+        lines += [
+            f"- **{g.label}** is required by "
+            + (f"`{g.source}`" if g.source else "the form")
+            + f" and appears in {_pct(g.rate)} of tickets."
+            for g in ignored
+        ]
+        lines += [
+            "",
+            "A required field this far under is usually a form asking for something "
+            "people cannot easily give. Changing the form is the cheaper fix - unless "
+            "the field belongs to a form these tickets do not use, which a project "
+            "with several of them will see here first.",
+            "",
+        ]
+
+    if undeclared:
+        lines += [
+            "## Written by habit, declared nowhere",
+            "",
+            "Sections most tickets carry that no template asks for. These are "
+            "conventions the project grew; adding them to the form is how they "
+            "survive the next person who joins.",
+            "",
+        ]
+        lines += [f"- {heading}" for heading in undeclared]
         lines.append("")
 
     return "\n".join(lines)

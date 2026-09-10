@@ -8,6 +8,7 @@ The verbs, roughly in the order a ticket passes through them:
 - `style` prints what it learned.
 - `context` gathers what already exists about a subject.
 - `compose` writes a ticket from a title. The one verb that needs a model.
+- `gaps` compares the declared issue template with the tickets that arrive.
 - `draft` checks a ticket you have written but not created.
 - `review` measures one that exists.
 - `open` reviews every open ticket, worst first.
@@ -34,10 +35,19 @@ from .context import gather
 from .corpus import Gathered, by_mining, from_keys
 from .i18n import SUPPORTED, ticket_language
 from .profile import Profile, build
-from .report import render_batch, render_context, render_profile, render_review
+from .report import (
+    render_batch,
+    render_context,
+    render_contrast,
+    render_gaps,
+    render_profile,
+    render_review,
+)
 from .review import review as review_one
 from .review import review_draft
 from .schemas import TicketQuery
+from .templates import compare as compare_templates
+from .templates import read as read_templates
 from .trackers import TrackerError, available
 from .writers import WriterError
 
@@ -84,16 +94,24 @@ def cmd_learn(args: argparse.Namespace) -> int:
             tracker,
             cfg.project,
             sample=args.sample,
-            want=args.want,
+            want=args.keep,
             labels=tuple(args.label or ()),
             on_progress=_progress,
         )
 
-    profile = build(gathered.exemplars, project=cfg.project, tracker=cfg.tracker)
+    profile = build(
+        gathered.exemplars,
+        project=cfg.project,
+        tracker=cfg.tracker,
+        contrast=gathered.contrast,
+        limits=gathered.limits,
+    )
     path = _profile_path(cfg.slug)
     path.write_text(profile.to_json(), encoding="utf-8")
 
     print(render_profile(profile, gathered))
+    if gathered.contrast:
+        print(render_contrast(gathered.contrast))
     print(f"\nSaved to {path}", file=sys.stderr)
     if not gathered.enough:
         print(
@@ -123,6 +141,17 @@ def cmd_context(args: argparse.Namespace) -> int:
         repo=root,
     )
     print(render_context(context))
+    return 0
+
+
+def cmd_gaps(args: argparse.Namespace) -> int:
+    """The declared issue template against the tickets that actually arrive."""
+    cfg = settings(args.tracker, args.project)
+    profile = _load(cfg.slug)
+    root = Path(args.repo or os.environ.get("TICKET_AI_REPO") or Path.cwd())
+    declared = read_templates(root)
+    gaps, undeclared = compare_templates(declared, profile)
+    print(render_gaps(declared, gaps, undeclared, profile.sample_size))
     return 0
 
 
@@ -207,15 +236,32 @@ def cmd_models(args: argparse.Namespace) -> int:
         print(snippet())
         return 0
 
-    writer = writer_for(args.writer or os.environ.get("TICKET_AI_WRITER") or "ollama")
+    # Defaulting to ollama is right for a question like "what can I use?" -
+    # it is the backend that needs no key. Saying which one was tried is the
+    # part that was missing: with nothing configured, the old message talked
+    # about a key that had never been set, for an endpoint it did not name.
+    chosen = args.writer or os.environ.get("TICKET_AI_WRITER") or "ollama"
+    writer = writer_for(chosen)
     found = writer.models() if writer else []
     if not found:
+        where = getattr(writer, "base_url", "") or "the configured endpoint"
         print(
-            "Could not list models. The endpoint may not serve /models, it may not "
-            "be running, or the key may be wrong. Set TICKET_AI_MODEL by hand if "
-            "you already know the name you want.",
+            f"No models came back from {where} ({chosen}).",
             file=sys.stderr,
         )
+        if not os.environ.get("TICKET_AI_WRITER") and not args.writer:
+            print(
+                "Nothing is configured, so this tried a local Ollama. Start it, or "
+                "set TICKET_AI_WRITER to openai with TICKET_AI_BASE_URL and "
+                "TICKET_AI_API_KEY for a hosted one.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "It may not serve /models, it may not be running, or the key may be "
+                "wrong. Set TICKET_AI_MODEL by hand if you already know the name.",
+                file=sys.stderr,
+            )
         return 1
     current = getattr(writer, "model", "")
     for name in found:
@@ -282,8 +328,13 @@ def _force_utf8() -> None:
             pass
 
 
-def main(argv: list[str] | None = None) -> int:
-    _force_utf8()
+def build_parser() -> argparse.ArgumentParser:
+    """Every command, in one place something other than `main` can read.
+
+    Split out so the documentation checks can ask what the commands are. They
+    scraped `--help` at first, and reported the choices of `--tracker` as
+    undocumented commands - a parser knows the difference and prose does not.
+    """
     parser = argparse.ArgumentParser(
         prog="ticket-ai",
         description=(
@@ -302,7 +353,17 @@ def main(argv: list[str] | None = None) -> int:
         "Taken as given: no filtering, no scoring against them.",
     )
     learn.add_argument("--sample", type=int, default=150, help="closed tickets to consider")
-    learn.add_argument("--want", type=int, default=30, help="exemplars to keep")
+    # `--keep` and not `--want`, to match the MCP tool's `keep`. One knob with
+    # two names across two front ends of the same tool is a papercut nobody
+    # reports and everybody hits; the old spelling still works.
+    learn.add_argument(
+        "--keep",
+        "--want",
+        type=int,
+        default=30,
+        dest="keep",
+        help="exemplars to keep",
+    )
     learn.add_argument("--label", action="append", help="only mine tickets with this label")
     learn.set_defaults(func=cmd_learn)
 
@@ -319,6 +380,13 @@ def main(argv: list[str] | None = None) -> int:
         help="checkout to search. Defaults to TICKET_AI_REPO, then the working directory.",
     )
     ctx.set_defaults(func=cmd_context)
+
+    gap = sub.add_parser(
+        "gaps",
+        help="the issue template this repo declares, against the tickets it gets",
+    )
+    gap.add_argument("--repo", help="checkout holding the templates. Defaults to TICKET_AI_REPO.")
+    gap.set_defaults(func=cmd_gaps)
 
     dft = sub.add_parser(
         "draft",
@@ -382,7 +450,20 @@ def main(argv: list[str] | None = None) -> int:
     op.add_argument("--limit", type=int, default=100)
     op.set_defaults(func=cmd_open)
 
-    args = parser.parse_args(argv)
+    return parser
+
+
+def subcommands() -> tuple[str, ...]:
+    """The registered subcommand names."""
+    for action in build_parser()._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return tuple(sorted(action.choices))
+    return ()
+
+
+def main(argv: list[str] | None = None) -> int:
+    _force_utf8()
+    args = build_parser().parse_args(argv)
     try:
         return args.func(args)
     except (TrackerError, WriterError) as exc:

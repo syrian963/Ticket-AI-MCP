@@ -24,6 +24,30 @@ before work started. The tickets that scored well become the corpus.
 **Measures new tickets against it.** Sections, length, labels, title markers,
 language. Every finding cites a count over that corpus.
 
+**Learns from the tickets that failed, not only the ones that worked.** Every
+rate it reports can be a comparison: not "78% of tickets have acceptance
+criteria" but *"78% of the ones that shipped, and 30% of the ones that
+stalled"*. The second is evidence; the first invites a shrug.
+
+The split is on **outcome alone** — a merged change, a reopen, a run of
+clarifying questions — and never on what the ticket contains. Splitting on
+content and then comparing content would be circular. It also ignores tickets a
+staleness bot closed, because those say something about attention rather than
+about writing.
+
+On a board where nothing separates the two groups, it says so. That is worth
+knowing before anyone is asked to write differently.
+[**docs/shipped-against-stalled.md**](docs/shipped-against-stalled.md) has the
+guards, and the real board that forced the staleness-bot exclusion.
+
+**Reads the form you declared, not just the tickets you got.** If the repo has
+`.github/ISSUE_TEMPLATE` or `.gitlab/issue_templates`, `gaps` lines each field
+up against how often tickets actually carry it — and the gap runs both ways. On
+`astral-sh/uv` a required field turns up in 10% of tickets, which is a form
+asking for something people cannot easily give rather than a discipline
+problem. A section most tickets carry that no form mentions is the opposite: a
+convention the project grew and never wrote down.
+
 **Gathers what you need to write one.** Give it a subject and it returns the
 related past tickets, **the files the merge requests for those tickets actually
 changed**, and the files in your checkout that mention it. That middle one
@@ -91,6 +115,10 @@ export TICKET_AI_GITLAB_URL=https://gitlab.example.com
 export TICKET_AI_GITLAB_TOKEN=...         # read_api scope is enough
 ```
 
+The token is optional on a public project — `TICKET_AI_GITLAB_URL=https://gitlab.com`
+with no token reads any public board, which is the quickest way to see what the
+tool does before pointing it at your own instance.
+
 <details>
 <summary>Jira and GitHub</summary>
 
@@ -125,6 +153,7 @@ ticket-ai learn                      # mine the tracker, cache the profile
 ticket-ai learn --from '#412,#98'    # or name the good ones yourself
 ticket-ai style                      # what it learned
 ticket-ai context 'export is broken on mobile'   # what already exists
+ticket-ai gaps                       # the declared template vs what arrives
 ticket-ai draft --title '...' --file draft.md    # check one before creating it
 ticket-ai review '#42'             # measure one ticket
 ticket-ai open                       # every open ticket, worst first
@@ -143,9 +172,10 @@ ticket-ai models --workflow          # an Actions workflow that drafts new issue
 once, and prints the review to stderr so the body alone can be redirected.
 `--fail-under` makes it refuse to emit a draft that missed the house style.
 
-[**docs/local-models.md**](docs/local-models.md) has seven real runs across
-three boards with a 2 GB local model — what came back, how long it took, and
-the two prompt bugs that batch exposed.
+[**docs/what-it-produces.md**](docs/what-it-produces.md) prints five tickets it
+produced, unedited, with the score each one got.
+[**docs/local-models.md**](docs/local-models.md) covers running the writer on a
+2 GB local model instead: measured timings, and what that trades away.
 
 `draft` is the one worth building a habit around. Checking a ticket after you
 create it puts the review past the point of no return: the board has already
@@ -164,6 +194,7 @@ The shortest quarter of tickets that shipped here start at 639; the median is 10
 
 `learn` takes a minute or two — ranking needs each ticket's comments and linked
 merge requests, which is an extra request or two per ticket. It caches to
+`TICKET_AI_CACHE_DIR` if you set one, otherwise to
 `.ticket-ai/`, so you do it once, not once per review.
 
 `--from` is taken as given: no filtering, no scoring against your choices. If
@@ -227,9 +258,9 @@ ticket-ai review "$CI_ISSUE" --fail-under 0.5
 }
 ```
 
-Seven tools, all read-only: `learn_conventions`, `house_style`,
-`ticket_template`, `ticket_context`, `review_draft`, `review_ticket`,
-`review_open_tickets`.
+Eight tools, all read-only: `learn_conventions`, `house_style`,
+`ticket_template`, `ticket_context`, `template_gaps`, `review_draft`,
+`review_ticket`, `review_open_tickets`.
 
 Add `TICKET_AI_REPO` to the `env` block if the checkout you want searched is
 not the assistant's working directory.
@@ -288,6 +319,23 @@ signal there falls back to remote links. Teams relying on smart commits will see
 weaker rankings, and `detail` reports nothing rather than guessing — which makes
 the ranking on Jira weaker than on GitLab or GitHub. That is a limit of the API,
 not of the corpus.
+
+### What running it against real things found
+
+[**docs/thirty-boards.md**](docs/thirty-boards.md) is what happened when this
+was driven across every board its three adapters can reach — thirty GitHub
+repositories, six GitLab projects and seven Jira projects on five instances —
+and then driven the way a person drives it: through the MCP tools over the
+protocol, the CLI, a browser, and a clean install of the built wheel.
+
+A repository that had moved, one with issues switched off, a staleness bot
+inverting a comparison, a display cap that was doing the selecting, a Jira
+behind a company hostname, 349 tickets reported as never having shipped, every
+error message being swallowed before it reached the caller, and a release gate
+that could only pass on the machine it was written on.
+
+Almost all of it had full line coverage at the time. That is the point of the
+page.
 
 ### Verified against
 

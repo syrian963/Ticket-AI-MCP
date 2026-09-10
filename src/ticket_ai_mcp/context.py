@@ -108,11 +108,18 @@ def gather(
     for i, match in enumerate(rank(subject, tickets, limit=5)):
         files: tuple[str, ...] = ()
         if i < CHANGES_FOR_TOP:
+            # `changed_files` is the optional fourth method: the protocol says
+            # so, and says callers treat it as a bonus rather than a fact they
+            # can rely on. This called it anyway, so an adapter implementing
+            # only the three required methods took the whole tool down with an
+            # AttributeError - which the MCP layer then reported as "Error
+            # executing tool ticket_context" with the cause left behind.
+            changed = getattr(tracker, "changed_files", None)
             try:
                 detail = tracker.detail(match.ticket)
                 for change in detail.linked_changes:
-                    if change.merged:
-                        files += tracker.changed_files(project, change)
+                    if change.merged and callable(changed):
+                        files += changed(project, change)
             except TrackerError:
                 # One unreadable merge request costs that one, not the run.
                 pass
@@ -127,7 +134,17 @@ def gather(
         else:
             notes.append(f"{repo} is not a directory, so no code was searched.")
 
-    if profile is not None and profile.sample_size == 0:
+    # Both halves of "there is no house style here", and the first one was the
+    # one being missed. `profile is None` is what the server passes before
+    # anything has been learned - the state every first-time caller is in - and
+    # the condition only covered a profile that exists and is empty, so the
+    # commonest case produced a context that quietly had no template behind it.
+    if profile is None:
+        notes.append(
+            "No house style has been learned for this project yet, so nothing here "
+            "is measured against how the team writes. Call learn_conventions for that."
+        )
+    elif profile.sample_size == 0:
         notes.append("No house style has been learned, so there is no template to follow.")
 
     return Context(

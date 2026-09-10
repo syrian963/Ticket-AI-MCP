@@ -25,23 +25,29 @@ from the house style the machine got.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .context import Context
 from .profile import Profile
 from .review import Review
 from .review import review_draft as _review_draft
+from .textstats import normalise_heading
 from .writers.base import Writer
 
 SYSTEM = """You write tickets for one specific team, in their house style.
 
 Rules, in order of importance:
 
-1. Write in {language}. Every heading and every sentence.
+1. Write in {language}. Every sentence you write. The section headings are the
+   exception: they are the team's own, copied exactly, even when they are in
+   another language - translating one makes it a section this team does not
+   have.
 2. Use exactly the sections you are given, with those headings, in that order.
-   Do not add sections. Do not rename them. In particular, labels are metadata
-   the tracker stores separately - never write a "Labels" section, and never
-   list them in the body.
+   Do not add sections. Do not rename them. If you are told this team writes
+   prose, that is the instruction: no headings at all. In particular, labels
+   are metadata the tracker stores separately - never write a "Labels"
+   section, and never list them in the body.
 3. Say only what the input supports. You are given a title, related tickets and
    file paths. If you do not know why something is broken, describe what is
    wrong and what should happen instead - never invent a cause, an error
@@ -70,11 +76,27 @@ class Composed:
     model: str
 
 
-def _skeleton_block(profile: Profile) -> str:
-    lines = []
-    for heading, why in profile.skeleton():
-        lines.append(f"## {heading}    <- {why}")
-    return "\n".join(lines) or "(no recurring sections: this team writes prose)"
+def _skeleton_block(profile: Profile) -> list[str]:
+    """The section list, or an instruction to write without one.
+
+    Two shapes rather than one, because the heading and the content have to
+    agree. A board with no recurring section used to get "Sections to use, and
+    why each one:" followed by "(no recurring sections)" - a heading promising
+    a list, and then no list - while the system prompt was separately telling
+    the model to use exactly the sections it was given. Three of the
+    forty-three boards in the fleet write pure prose, and a model handed that
+    contradiction resolves it the way models do: it invents the sections.
+    """
+    lines = [f"## {heading}    <- {why}" for heading, why in profile.skeleton()]
+    if lines:
+        return ["Sections to use, and why each one:", *lines]
+    return [
+        # Not "no heading recurs": on MongoDB's SERVER board one does, it is
+        # simply not common enough for the skeleton to ask for. The sentence
+        # has to be true of both that board and one with no headings at all.
+        "This team has no section every ticket uses. Write the description as "
+        "prose paragraphs, with no headings at all.",
+    ]
 
 
 def build_prompt(title: str, profile: Profile, context: Context | None = None) -> str:
@@ -88,8 +110,7 @@ def build_prompt(title: str, profile: Profile, context: Context | None = None) -
     """
     parts = [
         f"Ticket title:\n{title}\n",
-        "Sections to use, and why each one:",
-        _skeleton_block(profile),
+        *_skeleton_block(profile),
         "",
     ]
 
@@ -156,6 +177,36 @@ def _revision_prompt(body: str, review: Review) -> str:
     return "\n".join(lines)
 
 
+_SETEXT_RULE = re.compile(r"^(=|-){3,}\s*$")
+
+
+def _drop_repeated_title(title: str, text: str) -> str:
+    """Take the title back off the front of the body, if the model put it there.
+
+    The system prompt says to write the description only, and llama3.2 opened a
+    draft with the ticket title underlined in `=` anyway. The body goes into
+    the description field, where the title is already displayed directly above
+    it, so a copy of it is noise in every ticket the tool writes.
+
+    Only a first line that *is* the title comes off - matched on the same
+    normalisation headings use, so punctuation and case do not save it. A first
+    line that says something else is the model's own opening sentence and it
+    stays, whatever it looks like.
+    """
+    body = (text or "").strip()
+    if not body:
+        return body
+    lines = body.splitlines()
+    first = lines[0].lstrip("#").strip()
+    if normalise_heading(first) != normalise_heading(title):
+        return body
+    rest = lines[1:]
+    # A setext underline belongs to the line above it and goes with it.
+    if rest and _SETEXT_RULE.match(rest[0].strip()):
+        rest = rest[1:]
+    return "\n".join(rest).strip()
+
+
 def compose(
     title: str,
     profile: Profile,
@@ -169,12 +220,12 @@ def compose(
     language = {"de": "German", "en": "English"}.get(profile.language or "", "English")
     system = SYSTEM.format(language=language, target=round(profile.chars_median) or 800)
 
-    body = writer.write(system, build_prompt(title, profile, context)).strip()
+    body = _drop_repeated_title(title, writer.write(system, build_prompt(title, profile, context)))
     review = _review_draft(title, body, profile, labels=labels)
     attempts = 1
 
     while attempts <= revisions and review.findings:
-        revised = writer.write(system, _revision_prompt(body, review)).strip()
+        revised = _drop_repeated_title(title, writer.write(system, _revision_prompt(body, review)))
         attempts += 1
         candidate = _review_draft(title, revised, profile, labels=labels)
         # Keep the better of the two. A revision that scores worse is a

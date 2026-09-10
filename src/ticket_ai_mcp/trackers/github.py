@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 from ..schemas import Comment, LinkedChange, Ticket, TicketDetail, TicketQuery
-from .base import TrackerError, register, utc, walk
+from .base import TrackerError, rate_limit_message, register, utc, walk
 
 PAGE_SIZE = 100
 # A ceiling on the walk, so a repository that is all pull requests costs ten
@@ -75,6 +75,7 @@ class GitHubTracker:
         # issues fifty to one, and counting pages returned twenty because this
         # endpoint now pages by cursor underneath. See `base.walk`.
         found: list[dict[str, Any]] = []
+        rows_seen = 0
         for batch in walk(
             self._client,
             f"/repos/{query.project}/issues",
@@ -82,10 +83,49 @@ class GitHubTracker:
             max_pages=MAX_PAGES,
             page_size=PAGE_SIZE,
         ):
+            rows_seen += len(batch)
             found.extend(self._rows(batch))
             if len(found) >= query.limit:
                 break
+
+        # Hundreds of rows and not one issue means this repository has its
+        # issue tracker turned off and the endpoint is serving pull requests
+        # only. Returning an empty list would send the caller off to build a
+        # profile from nothing and wonder why every rate is zero.
+        if rows_seen and not found:
+            raise TrackerError(self._why_no_issues(query.project, rows_seen))
         return [self._to_ticket(r, query.project) for r in found][: query.limit]
+
+    def _why_no_issues(self, project: str, rows_seen: int) -> str:
+        """Turn the inference into a fact, with one request.
+
+        The repository endpoint reports `has_issues`, so the guess this used to
+        make - "most likely has issues disabled" - is answerable outright, and
+        only ever needs asking on the rare board that reaches this line.
+        Checked against two real repositories that hit it: both are
+        `has_issues: false`, so the inference had been right, and saying it
+        without the hedge is worth one call on a path that has already spent
+        ten pages.
+        """
+        try:
+            response = self._client.get(f"/repos/{project}")
+            # Anything but the object GitHub documents falls through to the
+            # inference. This function exists to produce a good message, so it
+            # is not allowed to raise while doing it.
+            body = response.json() if response.status_code < 400 else None
+            if isinstance(body, dict) and body.get("has_issues") is False:
+                return (
+                    f"{project} has issues disabled - GitHub says so, and all "
+                    f"{rows_seen} rows on its issues endpoint are pull requests. "
+                    "Whatever this project uses for tickets, it is not here."
+                )
+        except (httpx.HTTPError, ValueError):
+            pass
+        return (
+            f"{project} returned {rows_seen} rows and no issues - every one was a "
+            "pull request. The repository most likely has issues disabled and uses "
+            "another tracker. Check the Issues tab."
+        )
 
     def _text_search(self, query: TicketQuery) -> list[Ticket]:
         bits = [f"repo:{query.project}", "is:issue", query.text or ""]
@@ -97,7 +137,7 @@ class GitHubTracker:
             params={"q": " ".join(b for b in bits if b), "per_page": min(100, query.limit)},
         )
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} searching: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, "/search/issues"))
         items = (response.json() or {}).get("items") or []
         return [self._to_ticket(r, query.project) for r in items][: query.limit]
 
@@ -107,7 +147,7 @@ class GitHubTracker:
         if response.status_code == 404:
             raise TrackerError(f"no issue {key} in {project}, or the token cannot see it.")
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} fetching {key}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, f"issue {key}"))
         return self._to_ticket(response.json(), project)
 
     def detail(self, ticket: Ticket) -> TicketDetail:
@@ -178,7 +218,7 @@ class GitHubTracker:
         if response.status_code in (403, 404, 410):
             return []
         if response.status_code >= 400:
-            raise TrackerError(f"{response.status_code} from {path}: {response.text[:200]}")
+            raise TrackerError(rate_limit_message(response, path))
         body = response.json()
         return body if isinstance(body, list) else []
 

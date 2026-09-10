@@ -15,10 +15,13 @@ English and German only. A third language here would be a translation table
 nobody maintains and a fourth would be worse; these are the two this was built
 against, and an unknown code falls back to English rather than showing keys.
 
-Findings are deliberately **not** translated. Their text carries counts over a
-named sample - "31 of the 40 exemplar tickets" - and it is quoted verbatim into
-tickets and review comments. A half-translated sentence with a number in it is
-worse than an English one.
+Findings are translated too, and they are **not** kept here. They live in
+`messages.py` as data - a code plus the measurements - and the sentence is
+built at the moment of display. The argument for leaving them in English was
+that they carry counts over a named sample, and a half-translated sentence with
+a number in it reads worse than an English one; seeing a German page say
+*Übereinstimmung mit dem Hausstil* and then *The ticket has no description at
+all* settled that. This module holds the chrome only.
 """
 
 from __future__ import annotations
@@ -41,6 +44,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "style.blocks": "Sections that travel together",
         "style.length": "Length",
         "style.habits": "Habits",
+        # The rows under it. They were the dictionary's own keys, printed
+        # straight into the page - so a German reader got a German heading
+        # over a list reading "labelled, assigned, list, checklist".
+        "habit.labelled": "labelled",
+        "habit.assigned": "assigned",
+        "habit.list": "a list",
+        "habit.checklist": "a checklist",
+        "habit.code": "a code block",
+        "habit.screenshot": "a screenshot",
+        "habit.cross_ref": "links another ticket",
         "style.labels": "Labels in use",
         "style.language": "Tickets here are written in",
         "style.measured": "Measured from",
@@ -87,6 +100,13 @@ _STRINGS: dict[str, dict[str, str]] = {
         "style.blocks": "Abschnitte, die zusammen auftreten",
         "style.length": "Länge",
         "style.habits": "Gewohnheiten",
+        "habit.labelled": "mit Labels",
+        "habit.assigned": "zugewiesen",
+        "habit.list": "eine Liste",
+        "habit.checklist": "eine Checkliste",
+        "habit.code": "ein Code-Block",
+        "habit.screenshot": "ein Screenshot",
+        "habit.cross_ref": "verweist auf ein anderes Ticket",
         "style.labels": "Verwendete Labels",
         "style.language": "Tickets werden hier geschrieben auf",
         "style.measured": "Gemessen an",

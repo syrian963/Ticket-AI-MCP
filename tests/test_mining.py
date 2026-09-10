@@ -8,6 +8,7 @@ looks fine and quietly describes one bot, or one person, instead of the team.
 
 from __future__ import annotations
 
+import pytest
 from conftest import GOOD_BODY, make_detail, make_ticket
 
 from ticket_ai_mcp.mining import pick, score
@@ -161,3 +162,46 @@ class TestDiversity:
         first, _ = pick(details, want=5)
         second, _ = pick(list(reversed(details)), want=5)
         assert [e.key for e in first] == [e.key for e in second]
+
+
+class TestEveryReadFailing:
+    """A corpus where the listing worked and nothing behind it did.
+
+    Found anonymously on a public GitLab board: forty tickets listed, and the
+    history of every one came back 401. The tool profiled the empty result and
+    reported a page of zeroes - a label rate of 0.00 and no sections reads
+    exactly like a team that labels nothing and writes no headings.
+    """
+
+    def tracker(self, count: int):
+        from ticket_ai_mcp.trackers import TrackerError
+
+        class Refusing:
+            name = "test"
+
+            def search(self, query):
+                return [make_ticket(f"#{i}", description=GOOD_BODY) for i in range(count)]
+
+            def fetch(self, project, key):  # pragma: no cover - unused here
+                raise TrackerError("no")
+
+            def detail(self, ticket):
+                raise TrackerError("401 Unauthorized")
+
+        return Refusing()
+
+    def test_it_refuses_instead_of_profiling_nothing(self):
+        from ticket_ai_mcp.corpus import by_mining
+        from ticket_ai_mcp.trackers import TrackerError
+
+        with pytest.raises(TrackerError, match="none of them could be read"):
+            by_mining(self.tracker(40), "acme/shop", sample=40, want=10)
+
+    def test_a_project_with_no_closed_tickets_is_not_an_error(self):
+        # Nothing listed is a quiet project, which is a fact about the board
+        # rather than a failure, and it still has to come back empty.
+        from ticket_ai_mcp.corpus import by_mining
+
+        gathered = by_mining(self.tracker(0), "acme/shop", sample=40, want=10)
+        assert gathered.exemplars == []
+        assert not gathered.enough

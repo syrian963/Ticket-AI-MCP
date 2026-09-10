@@ -55,6 +55,7 @@ def make_detail(
     merged: bool = True,
     questions: int = 0,
     reopens: int = 0,
+    linked: tuple[LinkedChange, ...] | None = None,
     **kwargs,
 ) -> TicketDetail:
     """A ticket plus the history that mining reads.
@@ -62,17 +63,25 @@ def make_detail(
     `questions` is the knob that matters most: it is the count of human
     comments containing a question mark, which is how mining detects a ticket
     that was not clear as written.
+
+    `linked` overrides the changes entirely, for the case `merged` cannot
+    express: a ticket that links to a change whose merge state the tracker
+    does not report. That is every Jira ticket, and it is the difference
+    between "nothing was linked" and "nothing is known".
     """
     ticket = ticket or make_ticket(**kwargs)
     comments = tuple(
         Comment(author="dev", body=f"what does {i} mean?", created_at=BASE)
         for i in range(questions)
     )
-    changes = (
-        (LinkedChange(ref="!9", title="do it", url="u", state="merged", merged=True),)
-        if merged
-        else ()
-    )
+    if linked is not None:
+        changes = linked
+    else:
+        changes = (
+            (LinkedChange(ref="!9", title="do it", url="u", state="merged", merged=True),)
+            if merged
+            else ()
+        )
     return TicketDetail(
         ticket=ticket, comments=comments, linked_changes=changes, reopen_count=reopens
     )

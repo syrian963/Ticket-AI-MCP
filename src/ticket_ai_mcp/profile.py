@@ -19,7 +19,7 @@ Three things this deliberately does not do:
   enough to demand of a new ticket is `review.py`'s job, and it is one setting
   in one place.
 - **Hide a thin sample.** Eleven exemplars produce a profile with eleven
-  exemplars' worth of authority, and `notes` says so in words that end up in
+  exemplars worth of authority, and the notes say so in words that end up in
   the report.
 """
 
@@ -39,17 +39,71 @@ from .textstats import language, median, normalise_heading, quantile, shape
 # of six moves a rate by 17 points.
 THIN_SAMPLE = 12
 
+# How many headings may be used as the "when" half of a rule.
+#
+# Every ordered pair of triggers is examined, so the work grows with the square
+# of this number and nothing was bounding it. Measured with a corpus of twelve
+# tickets: 500 recurring headings cost 0.3 seconds, 2000 cost 3.5, and 3000
+# cost ten - and `learn_conventions` is an MCP call somebody is waiting on.
+#
+# The widest real board in the fleet produced eleven triggers, and the one with
+# the most sections had twenty-five. Sixty is five times the worst case
+# observed and turns an unbounded quadratic into 3540 pairs. When the cap
+# binds, it keeps the headings the team uses most, because a rule wants
+# evidence behind it.
+MAX_TRIGGERS = 60
+
+# A stop, not a target. Every rule that clears the threshold is kept, because
+# `clusters` needs the whole graph to recognise a block; the report shows the
+# strongest handful. The widest board in the fleet, BurntSushi/ripgrep,
+# produces fifty-six - which the report prints as one block of eight sections
+# and no loose rules at all, and which costs a reviewed ticket at most one
+# finding. Keeping the graph whole makes the output smaller, not larger.
+MAX_CONDITIONALS = 90
+
 # A leading marker some teams put on every title: `fix:`, `[Backoffice]`,
 # `BUG -`. Captured as a shape rather than a word so it generalises.
 _TITLE_PREFIX = re.compile(r"^\s*(\[[^\]]{1,24}\]|[A-Za-zÄÖÜäöü]{2,12}\s*[:/-])\s*\S")
 
 
 # A conditional convention needs a trigger that is not itself a rarity, or the
-# "rule" is three tickets agreeing with each other.
-MIN_TRIGGER = 5
+# "rule" is three tickets agreeing with each other. Raised from five after
+# measurement: at five, a trigger is one ticket away from moving its rate by
+# twenty points.
+MIN_TRIGGER = 8
+
 # And the conditional rate has to beat the overall rate by enough that it is
 # telling you something the overall rate did not.
+#
+# **This is a floor, not the test.** Every ordered pair of sections is a
+# hypothesis, so a board with fourteen sections tests around 180 of them, and
+# keeping whichever look good is the oldest mistake in statistics. Simulated
+# against random data: a pair with no association at all clears a flat 0.25
+# lift 8% of the time, which is fourteen invented rules per board - and it
+# showed, because sixteen of thirty boards came back holding exactly the
+# twelve the display cap allowed.
+#
+# `required_lift` below raises the bar with the number of pairs tested.
 MIN_LIFT = 0.25
+
+
+def required_lift(pairs: int) -> float:
+    """How big a gap has to be, given how many pairs were examined.
+
+    Testing more hypotheses means seeing more extremes by luck, so the
+    threshold rises with the count. The shape is deliberately crude - there is
+    no distributional claim here worth a real correction - but it moves in the
+    right direction and it is honest about why: on a board with two sections a
+    0.25 gap is interesting, and on a board with twenty it is noise.
+    """
+    if pairs <= 6:
+        return MIN_LIFT
+    # +0.05 for every doubling of the pair count past six, capped so a very
+    # wide board does not become unanswerable.
+    import math
+
+    steps = math.log2(pairs / 6)
+    return min(0.55, MIN_LIFT + 0.05 * steps)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +165,11 @@ class Profile:
 
     sections: tuple[Section, ...] = ()
     conditionals: tuple[Conditional, ...] = ()
+    # Sections that separated the tickets that shipped from the ones that
+    # stalled, as {normalised key: (shipped rate, stalled rate)}. Stored on the
+    # profile so a review can quote the contrast without re-mining, and empty
+    # whenever the two groups were too small to compare. See `contrast.py`.
+    discriminative: dict[str, tuple[float, float]] = field(default_factory=dict)
     chars_median: float = 0.0
     chars_p25: float = 0.0
     chars_p75: float = 0.0
@@ -131,7 +190,22 @@ class Profile:
     assignee_rate: float = 0.0
 
     language: str | None = None
-    notes: tuple[str, ...] = field(default_factory=tuple)
+    # The caveats, stored as a code and its measurements rather than as a
+    # sentence - the same move `Finding` made, for the same reason. A note
+    # built as an English f-string here is an English sentence on a German
+    # page, and these are the sentences that decide how much of the rest of
+    # the page a reader should believe. `notes` renders them in English;
+    # `localised_notes` renders them in whichever language was asked for.
+    note_codes: tuple[tuple[str, dict[str, Any]], ...] = field(default_factory=tuple)
+
+    @property
+    def notes(self) -> tuple[str, ...]:
+        return self.localised_notes()
+
+    def localised_notes(self, language: str | None = None) -> tuple[str, ...]:
+        from .messages import render_note
+
+        return tuple(render_note(code, params, language) for code, params in self.note_codes)
 
     @property
     def is_thin(self) -> bool:
@@ -209,10 +283,27 @@ class Profile:
         data: dict[str, Any] = json.loads(text)
         data["sections"] = tuple(Section(**s) for s in data.get("sections", ()))
         data["conditionals"] = tuple(Conditional(**c) for c in data.get("conditionals", ()))
-        for key in ("exemplar_keys", "label_groups", "notes"):
+        for key in ("exemplar_keys", "label_groups"):
             data[key] = tuple(data.get(key) or ())
+        # A note is a pair, and JSON has neither tuples nor a memory of which
+        # list was meant to be one.
+        data["note_codes"] = tuple(
+            (code, dict(params)) for code, params in data.get("note_codes") or ()
+        )
+        # A profile cached before notes became codes carries finished English
+        # sentences under the old key. Loading it has to keep working - the
+        # cache is written next to somebody's checkout and they did not ask for
+        # it to expire - and the sentences have to survive, because dropping a
+        # caveat quietly is the thing this whole change was about.
+        legacy = data.pop("notes", None)
+        if legacy and not data["note_codes"]:
+            data["note_codes"] = tuple(("_literal", {"text": text}) for text in legacy)
         for key in ("title_prefixes", "common_labels"):
             data[key] = tuple((a, b) for a, b in data.get(key) or ())
+        # JSON has no tuples; the pairs come back as lists.
+        data["discriminative"] = {
+            k: (float(v[0]), float(v[1])) for k, v in (data.get("discriminative") or {}).items()
+        }
         return cls(**data)
 
 
@@ -235,7 +326,11 @@ def _conditionals(
     useful depends on which half the author has already written.
     """
     found: list[Conditional] = []
-    keys = [key for key, count in counts.items() if count >= MIN_TRIGGER]
+    common = [key for key, _ in counts.most_common() if counts[key] >= MIN_TRIGGER]
+    keys = common[:MAX_TRIGGERS]
+    # The bar rises with the number of pairs examined. See `required_lift`:
+    # a flat threshold across 180 pairs invents about fourteen rules a board.
+    threshold = required_lift(len(keys) * max(len(keys) - 1, 0))
     for when in keys:
         with_trigger = [t for t in per_ticket if when in t]
         for then in keys:
@@ -244,7 +339,7 @@ def _conditionals(
             together = sum(1 for t in with_trigger if then in t)
             rate = together / len(with_trigger)
             baseline = counts[then] / n
-            if rate - baseline < MIN_LIFT:
+            if rate - baseline < threshold:
                 continue
             found.append(
                 Conditional(
@@ -260,7 +355,22 @@ def _conditionals(
             )
     # Strongest evidence first, so a report that truncates keeps the best of it.
     found.sort(key=lambda c: (-(c.rate - c.baseline), -c.of, c.when, c.then))
-    return tuple(found[:12])
+
+    # This used to cut at twelve, and twelve turned out to be doing two things
+    # wrong. Measured across five boards: on rollup/rollup thirty rules cleared
+    # the threshold and the cut fell in the middle of a tie - eighteen dropped,
+    # the best of them with exactly the lift of the weakest kept. There is no
+    # ranking inside a tie, so which twelve survived was arbitrary.
+    #
+    # Worse, those thirty rules were every ordered pair of six sections: a board
+    # whose template is one rigid block. `clusters` finds a block by looking for
+    # pairs that hold in both directions, so truncating first handed it a graph
+    # with half its edges missing and it reported the block as loose rules.
+    # Truncation is a display concern and it now lives in the report.
+    #
+    # The ceiling that remains is a sanity stop, not a selection: a vocabulary
+    # wide enough to clear it is a bug worth noticing, not a house style.
+    return tuple(found[:MAX_CONDITIONALS])
 
 
 def clusters(conditionals: tuple[Conditional, ...], floor: float = 0.6) -> list[list[str]]:
@@ -301,16 +411,34 @@ def clusters(conditionals: tuple[Conditional, ...], floor: float = 0.6) -> list[
     return [members for members in grouped.values() if len(members) > 1]
 
 
-def build(exemplars: list[Exemplar], *, project: str, tracker: str) -> Profile:
+def build(
+    exemplars: list[Exemplar],
+    *,
+    project: str,
+    tracker: str,
+    contrast=None,
+    limits: tuple[tuple[str, dict[str, Any]], ...] = (),
+) -> Profile:
     """Turn a corpus into a profile.
 
     An empty corpus produces an empty profile rather than an exception. The
     caller usually got here because a project has no closed tickets yet, and
     that is an answer to report, not a crash.
+
+    `contrast` is optional and carries the shipped-against-stalled comparison
+    from `contrast.py`. When it is present, findings can quote both rates
+    instead of one, which turns "78% of tickets have this" into "78% of the
+    ones that shipped, and 30% of the ones that stalled".
+
+    `limits` is what the tracker would not serve. It becomes a note rather than
+    a separate field because a note travels: the profile is cached and read
+    back for every later review, and a profile built from a board that was only
+    half readable has to say so every time it is shown, not only in the run
+    that built it.
     """
     tickets = [e.detail.ticket for e in exemplars]
     n = len(tickets)
-    notes: list[str] = []
+    notes: list[tuple[str, dict[str, Any]]] = list(limits)
 
     if n == 0:
         return Profile(
@@ -319,7 +447,7 @@ def build(exemplars: list[Exemplar], *, project: str, tracker: str) -> Profile:
             built_at=datetime.now(UTC).isoformat(),
             sample_size=0,
             exemplar_keys=(),
-            notes=("No ticket in the sample could be used as an exemplar.",),
+            note_codes=(*limits, ("no_exemplars", {})),
         )
 
     shapes = [shape(t.description) for t in tickets]
@@ -378,16 +506,9 @@ def build(exemplars: list[Exemplar], *, project: str, tracker: str) -> Profile:
     corpus_text = "\n".join(f"{t.title}\n{t.description}" for t in tickets)
 
     if n < THIN_SAMPLE:
-        notes.append(
-            f"Built from {n} tickets. Every rate below moves by more than "
-            f"{round(100 / n)} points if one ticket changes, so treat them as a hint "
-            "rather than a rule."
-        )
+        notes.append(("thin_sample", {"n": n, "points": round(100 / n)}))
     if not sections:
-        notes.append(
-            "No heading appears in two or more of these tickets: this team does not "
-            "seem to use a template, so nothing here can check for one."
-        )
+        notes.append(("no_template", {}))
 
     chars = [float(s.chars) for s in shapes]
     return Profile(
@@ -419,5 +540,13 @@ def build(exemplars: list[Exemplar], *, project: str, tracker: str) -> Profile:
         cross_ref_rate=round(sum(1 for s in shapes if s.ticket_refs) / n, 3),
         assignee_rate=round(sum(1 for t in tickets if t.assignees) / n, 3),
         language=language(corpus_text),
-        notes=tuple(notes),
+        # Only the section signals: the habit ones are already reported as
+        # rates, and a review quotes the contrast when it is checking a
+        # section it can name.
+        discriminative={
+            s.key.removeprefix("section:"): (s.shipped_rate, s.stalled_rate)
+            for s in (contrast.signals if contrast and contrast.usable else ())
+            if s.key.startswith("section:")
+        },
+        note_codes=tuple(notes),
     )

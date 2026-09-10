@@ -1,0 +1,46 @@
+# The cheap half of CI, before the commit rather than after the push.
+#
+# Deliberately only the fast hooks. The suite takes seconds and could run here
+# too, but a pre-commit hook people learn to skip with --no-verify is worse
+# than no hook: it teaches the habit, and then the one hook that mattered gets
+# skipped along with the rest.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^(src|tests)/
+      - id: ruff-format
+        files: ^(src|tests)/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=200]
+      - id: detect-private-key
+
+  # This repository was built against a private board, and material from it
+  # reached the tests and the documentation before anyone noticed. The check
+  # is a test - `tests/test_docs.py::TestNothingPrivate` - which CI runs
+  # whether or not anyone installed these hooks. This is the same check,
+  # earlier.
+  #
+  # It runs the test rather than repeating its pattern. The first version
+  # grepped for the words, which meant writing them here, which published
+  # them: this file was the one thing the test had to exempt from itself.
+  - repo: local
+    hooks:
+      - id: no-client-material
+        name: nothing from the private board
+        entry: uv run pytest tests/test_docs.py -k NothingPrivate -q
+        language: system
+        pass_filenames: false
+        always_run: true

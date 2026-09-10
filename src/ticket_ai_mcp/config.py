@@ -68,16 +68,17 @@ def settings(tracker: str | None = None, project: str | None = None) -> Settings
 def tracker_for(name: str) -> Tracker:
     """Build the named adapter from the environment."""
     if name == "gitlab":
+        # The token is read but not required, for the same reason as Jira's: a
+        # public project answers without one, and the adapter says what to set
+        # if this one will not.
         return build(
             "gitlab",
             url=_require(
                 "TICKET_AI_GITLAB_URL",
-                "Point it at your instance, for example https://gitlab.example.com.",
+                "Point it at your instance, for example https://gitlab.example.com, "
+                "or https://gitlab.com for a project hosted there.",
             ),
-            token=_require(
-                "TICKET_AI_GITLAB_TOKEN",
-                "A personal access token with the read_api scope is enough.",
-            ),
+            token=os.environ.get("TICKET_AI_GITLAB_TOKEN", "").strip(),
         )
     if name == "jira":
         # Email and token are read but not required: a public Jira answers
