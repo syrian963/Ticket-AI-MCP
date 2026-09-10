@@ -3,7 +3,7 @@
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org),
 and the release workflow refuses a tag with no section here.
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-09-10
 
 First cut. Learns what a team's tickets look like by measuring the ones that
 shipped, then holds new tickets to that.

@@ -1,13 +1,19 @@
-# Publishing is driven by a tag, and the tag has to agree with the version in
-# pyproject.toml and in server.json. A release that says 0.1.0 on PyPI, 0.1.1
-# in the metadata and 0.0.9 in the registry manifest is a support question
-# nobody can answer, so this refuses rather than guesses.
+# A tag verifies and builds; publishing is asked for separately. The tag has
+# to agree with the version in pyproject.toml and in server.json, because a
+# release that says 0.1.0 on PyPI, 0.1.1 in the metadata and 0.0.9 in the
+# registry manifest is a support question nobody can answer - so this refuses
+# rather than guesses.
 name: release
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to PyPI (leave off to only verify and build)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -63,9 +69,13 @@ jobs:
           name: dist
           path: dist/
 
+  # Tagging and publishing are two decisions, and this used to make them one.
+  # A tag is how a version gets recorded; PyPI is public and a version there
+  # cannot be replaced, so it waits to be asked for by hand. Run this workflow
+  # from the tag with `publish` ticked when that is what you mean.
   publish:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
     runs-on: ubuntu-latest
     environment: release
     permissions:
