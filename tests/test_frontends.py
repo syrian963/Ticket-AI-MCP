@@ -26,7 +26,6 @@ from ticket_ai_mcp.trackers import TrackerError, register
 from ticket_ai_mcp.trackers.base import _REGISTRY
 
 
-@register
 class FakeTracker:
     """Twenty-four tickets that all follow the same template, plus two that do not."""
 
@@ -62,6 +61,12 @@ class FakeTracker:
 @pytest.fixture
 def workspace(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("TICKET_AI_CACHE_DIR", str(tmp_path))
+    # Registered here rather than with a decorator on the class. A decorator
+    # runs when pytest *imports* this module, which is during collection - so
+    # a fake adapter was in the registry for every test in the session, and
+    # `teardown_module` only took it out again once this file was finished.
+    # Anything that asked which trackers exist before then saw four.
+    register(FakeTracker)
     monkeypatch.setenv("TICKET_AI_TRACKER", "fake")
     monkeypatch.setenv("TICKET_AI_PROJECT", "acme/shop")
     capsys.readouterr()
@@ -216,6 +221,8 @@ class TestMcpServer:
 
 
 def teardown_module(_):
+    # Belt as well as braces: the fixture scopes it, this catches a test that
+    # registers one some other way.
     _REGISTRY.pop("fake", None)
 
 

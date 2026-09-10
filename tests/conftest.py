@@ -104,3 +104,19 @@ The CSV export drops the last row when the result set is a multiple of 100.
 @pytest.fixture
 def good_body() -> str:
     return GOOD_BODY
+
+
+@pytest.fixture(autouse=True)
+def _registry_stays_put():
+    """No test may leave an adapter behind for the next one.
+
+    The tracker registry is module state, and a fake adapter registered for
+    one test was visible to every test that ran afterwards - which is how a
+    check on "which trackers exist" passed alone and failed in the suite.
+    """
+    from ticket_ai_mcp.trackers.base import _REGISTRY
+
+    before = dict(_REGISTRY)
+    yield
+    _REGISTRY.clear()
+    _REGISTRY.update(before)

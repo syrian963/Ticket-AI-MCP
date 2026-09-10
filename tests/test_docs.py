@@ -426,3 +426,45 @@ class TestTheInstallCheck:
     def test_ci_runs_it(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         assert "install_check.sh" in workflow
+
+
+class TestTheBadgesAreNotDecoration:
+    """A badge is a claim, and a number in one rots like any other.
+
+    "Five tools" already outlived two additions in the prose below; a badge is
+    the same sentence with a nicer background. These check the ones that can be
+    checked from here.
+    """
+
+    def badge(self, label: str) -> str:
+        # shields.io puts the value between the label and the colour, with
+        # dashes as separators and `%20` for the spaces.
+        found = re.search(rf"badge/{re.escape(label)}-([^-]+)-", readme())
+        assert found, f"no {label} badge in the README"
+        return found.group(1).replace("%20", " ").replace("%7C", "|")
+
+    def test_the_release_badge_matches_the_version(self):
+        declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        assert self.badge("release") == f"v{declared['project']['version']}"
+
+    def test_the_tool_count_badge_matches_the_server(self):
+        assert self.badge("MCP%20tools") == str(len(tool_names()))
+
+    def test_the_command_count_badge_matches_the_cli(self):
+        assert self.badge("CLI%20commands") == str(len(cli.subcommands()))
+
+    def test_the_tracker_badge_names_every_adapter(self):
+        from ticket_ai_mcp.trackers import available
+
+        named = {p.strip().lower() for p in self.badge("trackers").split("|")}
+        assert named == set(available())
+
+    def test_the_test_count_badge_matches_the_suite(self, request):
+        # Only when the whole suite ran: under `-k` the collected count is a
+        # subset and comparing against it would fail for no reason.
+        collected = len(request.session.items)
+        if collected < 200:
+            pytest.skip(f"only {collected} tests collected; run the whole suite")
+        assert self.badge("tests") == str(collected), (
+            f"the badge says {self.badge('tests')} tests, the suite has {collected}"
+        )
