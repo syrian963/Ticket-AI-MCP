@@ -3,6 +3,53 @@
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org),
 and the release workflow refuses a tag with no section here.
 
+## Unreleased
+
+### Measuring what the model writes
+
+Every test in this repository mocks the writer, so none of them said anything
+about the prose that comes back. `docs/local-models.md` came closest: seven
+titles, one model, one pass. `ticket-ai eval` is the difference between that
+and an evaluation.
+
+- **A dataset that does not move.** 109 cases over eight public boards, each
+  stored next to the board profile as it stood when the case was collected.
+  `compose` writes into whatever shape the profile describes, so relearning a
+  board between two runs moves the score with nothing about the model having
+  changed.
+- **Cases held out of the profile**, split by a SHA-256 bucket of the ticket id
+  before the profile is built. A case the profile was fitted to flatters the
+  model for a reason that has nothing to do with the model, and splitting by
+  rank instead would quietly make every case harder than the corpus marking it.
+- **Two figures `review_draft` does not have.** It asks whether the sections a
+  board uses are present; it never asks what else the draft invented, because
+  people rarely add a heading their board has never seen and models do it
+  constantly. And spread, because one number per case reads as precision a
+  non-deterministic writer cannot support.
+- **A gate that tolerates noise.** A drop has to exceed 0.05 absolute, and
+  every board is checked as well as the total — three points gained on one and
+  eight lost on another comes out level, and the level number is the one nobody
+  investigates.
+- **A judge with one question**, and Cohen's kappa to say whether to believe
+  it. Raw agreement is close to useless: nine on-topic drafts in ten and a
+  judge that always answers on_topic agree ninety percent of the time and have
+  learned nothing. Without human labels the output prints `uncalibrated` every
+  time rather than travelling as a number.
+
+The dataset covers all three branches `compose` takes — German and English, two
+trackers, and boards with a section skeleton as well as boards that write pure
+prose. CI asserts all three survive, because losing one would stop measuring it
+without the average moving.
+
+### Fixed
+
+- **`str.splitlines` is wrong for JSONL.** It breaks on U+2028, U+2029, U+0085
+  and three ASCII separators, and `json.dumps` escapes none of them. A German
+  ticket carries a literal U+2028, so a valid file read as a truncated record
+  and the error blamed the file. Three readers had it.
+- `ticket-ai eval` from an installed wheel now says the dataset belongs to the
+  repository, instead of reporting that a path inside site-packages is missing.
+
 ## [0.1.1] - 2026-09-11
 
 The package can be found without being named. The MCP registry proves that
