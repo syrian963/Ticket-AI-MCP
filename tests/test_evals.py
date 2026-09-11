@@ -843,3 +843,19 @@ def test_eval_writes_the_page_where_it_was_asked_to(tmp_path, capsys):
     page = tmp_path / "out" / "index.html"
     assert main(["eval", "--dataset", str(dataset), "--runs", str(runs), "--html", str(page)]) == 0
     assert page.read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+def test_a_missing_default_dataset_explains_that_it_is_not_in_the_wheel(monkeypatch, tmp_path):
+    # The likeliest way to see this is `ticket-ai eval` from an installed
+    # package. "does not exist" about a path inside site-packages sends people
+    # hunting for a broken install.
+    monkeypatch.setattr(
+        "ticket_ai_mcp.evals.dataset.DATASET_DIR", tmp_path / "not-here"
+    )
+    with pytest.raises(DatasetError, match="not part of the installed package"):
+        load_suite()
+
+
+def test_an_explicit_missing_directory_stays_a_short_message(tmp_path):
+    with pytest.raises(DatasetError, match=r"does not exist$"):
+        load_suite(tmp_path / "nope")

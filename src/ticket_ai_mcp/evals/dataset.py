@@ -184,6 +184,18 @@ def load_suite(root: Path | None = None) -> tuple[Board, ...]:
     """
     base = root or DATASET_DIR
     if not base.exists():
+        if root is None:
+            # The most likely way to land here is `ticket-ai eval` from an
+            # installed wheel. The package ships, the dataset does not: it is
+            # megabytes of other people's tickets and belongs to the
+            # repository, not to everyone who installs the tool. Saying only
+            # "does not exist" about a path inside site-packages sends people
+            # looking for a bug in their install.
+            raise DatasetError(
+                f"{base} does not exist. The dataset lives in the repository and is not "
+                "part of the installed package - clone it, or point --dataset at your own "
+                "board directory."
+            )
         raise DatasetError(f"{base} does not exist")
     directories = sorted(p for p in base.iterdir() if p.is_dir() and (p / BOARD_FILE).exists())
     if not directories:
