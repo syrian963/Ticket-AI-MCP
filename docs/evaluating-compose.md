@@ -11,7 +11,7 @@ evaluation.
 
 ## The dataset had to stop moving
 
-99 cases over seven public boards, each stored next to **the board profile as it
+109 cases over eight public boards, each stored next to **the board profile as it
 stood when the case was collected**.
 
 Freezing the profile is not tidiness. `compose` writes into whatever shape the
@@ -19,15 +19,23 @@ profile describes, so relearning a board between two runs changes the score with
 nothing about the model having changed, and the comparison then measures the
 wrong thing while looking exactly like a comparison.
 
-| Board | Cases | Tracker | Language | Shape |
-|---|---|---|---|---|
-| inkscape | 19 | GitLab | English | 7 sections |
-| kern-ux | 17 | GitLab | **German** | 24 sections |
-| gitlab-cli | 16 | GitLab | English | 14 sections |
-| kafka | 14 | **Jira** | English | **prose, no sections** |
-| fitko-fim | 13 | GitLab | **German** | 5 sections |
-| fdroid | 10 | GitLab | English | 4 sections |
-| veloren | 10 | GitLab | English | **prose, no sections** |
+| Board | Cases | Tracker | Language | Skeleton | Sections seen |
+|---|---|---|---|---|---|
+| inkscape | 19 | GitLab | English | 5 | 7 |
+| kern-ux | 17 | GitLab | **German** | 2 | 24 |
+| gitlab-cli | 16 | GitLab | English | 6 | 14 |
+| kafka | 14 | **Jira** | English | **prose** | 6 |
+| fitko-fim | 13 | GitLab | **German** | 3 | 5 |
+| fdroid | 10 | GitLab | English | 3 | 4 |
+| hibernate | 10 | **Jira** | English | **prose** | 4 |
+| veloren | 10 | GitLab | English | **prose** | 5 |
+
+Two columns, because they are two different things. **Skeleton** is what the
+prompt asks for: the sections common enough to be worth naming. **Sections
+seen** is everything the board ever used, and that is what an invented heading
+is measured against. kern-ux is the gap in the flesh - two sections are asked
+for and twenty-four have been used, so a draft can produce a heading nobody
+requested and still be writing in the house style.
 
 The spread is not variety for its own sake. **`compose` branches on each
 column.** A German system prompt, a tracker abstraction, and a `_skeleton_block`
@@ -143,6 +151,26 @@ than a result.
 **No labels yet**, so the judge cannot be calibrated and its output is exactly
 the opinion the `uncalibrated` line says it is.
 
-**One assertion is unproven.** The prose guard cannot fire on its own today,
-because the only Jira board is also a prose board, so dropping the prose boards
-trips the tracker assertion first.
+**One assertion cannot fire on its own, and it took a count to say why
+correctly.** The first guess was that shape and tracker line up exactly. They do
+not:
+
+| | prose | skeleton |
+|---|---|---|
+| **GitLab** | veloren | fdroid, fitko-fim, gitlab-cli, inkscape, kern-ux |
+| **Jira** | hibernate, kafka | — |
+
+There is a GitLab board writing prose. What is true is the weaker statement, and
+it is enough to explain the guard: **both Jira boards are prose**, so the prose
+set contains the Jira set, and removing every prose board removes every Jira
+board. The tracker assertion fires first and the prose assertion never gets a
+turn.
+
+The Jira half is probably not sampling luck. GitLab issue templates are files
+committed in the repository, so a board that wants a shape gets one by default;
+a Jira description is a free text field, and both Jira boards here read like
+mailing-list posts. One prose GitLab board against five with templates points
+the same way.
+
+The guard stays: it costs nothing and becomes meaningful the day a Jira board
+with a template joins. But this page should not claim it is being exercised.
