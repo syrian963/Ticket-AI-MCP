@@ -367,9 +367,11 @@ whose human half was generated compares one model to another. Without
 `--labels`, the judge line prints `uncalibrated` every time rather than
 documenting the caveat once and letting the number travel without it.
 
-The dataset is 72 cases over five public boards, one of them German
-(`kern-ux/pattern-library` on gitlab.opencode.de, skeleton `Beschreibung` and
-`Akzeptanzkriterien`). That board is why `jsonl_lines` exists: one of its
+The dataset is 85 cases over six public boards. **Thirty of them are German**,
+from `kern-ux/pattern-library` and `fitko/fim/portal` on gitlab.opencode.de, a
+public German GitLab that reads without a token. That matters because `compose`
+has a whole German branch in its system prompt and nothing measured it before.
+kern-ux is why `jsonl_lines` exists: one of its
 tickets carries a literal U+2028, `str.splitlines` treats that as a line break
 and `json.dumps` does not escape it, so a valid file read as a truncated record
 and the error blamed the file.

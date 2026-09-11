@@ -1,0 +1,224 @@
+{
+  "project": "fitko/fim/portal",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T14:46:53.753946+00:00",
+  "sample_size": 32,
+  "exemplar_keys": [
+    "#1034",
+    "#1042",
+    "#1126",
+    "#1127",
+    "#1217",
+    "#1253",
+    "#1264",
+    "#1272",
+    "#1294",
+    "#1297",
+    "#1306",
+    "#1308",
+    "#1314",
+    "#1316",
+    "#1330",
+    "#1342",
+    "#1350",
+    "#1363",
+    "#1402",
+    "#173",
+    "#174",
+    "#459",
+    "#643",
+    "#78",
+    "#1053",
+    "#1219",
+    "#1040",
+    "#1055",
+    "#1056",
+    "#1384",
+    "#1379",
+    "#1329"
+  ],
+  "sections": [
+    {
+      "heading": "Warum machen wir das?",
+      "key": "warum machen wir das",
+      "count": 22,
+      "rate": 0.688,
+      "position": 0.0
+    },
+    {
+      "heading": "Relevante Informationen",
+      "key": "relevante informationen",
+      "count": 18,
+      "rate": 0.562,
+      "position": 1.06
+    },
+    {
+      "heading": "Akzeptanzkriterien",
+      "key": "akzeptanzkriterien",
+      "count": 16,
+      "rate": 0.5,
+      "position": 2.56
+    },
+    {
+      "heading": "Todo",
+      "key": "todo",
+      "count": 2,
+      "rate": 0.062,
+      "position": 1.0
+    },
+    {
+      "heading": "Problem",
+      "key": "problem",
+      "count": 2,
+      "rate": 0.062,
+      "position": 0.0
+    }
+  ],
+  "conditionals": [
+    {
+      "when": "akzeptanzkriterien",
+      "when_heading": "Akzeptanzkriterien",
+      "then": "relevante informationen",
+      "then_heading": "Relevante Informationen",
+      "count": 15,
+      "of": 16,
+      "rate": 0.938,
+      "baseline": 0.562
+    },
+    {
+      "when": "relevante informationen",
+      "when_heading": "Relevante Informationen",
+      "then": "akzeptanzkriterien",
+      "then_heading": "Akzeptanzkriterien",
+      "count": 15,
+      "of": 18,
+      "rate": 0.833,
+      "baseline": 0.5
+    },
+    {
+      "when": "relevante informationen",
+      "when_heading": "Relevante Informationen",
+      "then": "warum machen wir das",
+      "then_heading": "Warum machen wir das?",
+      "count": 18,
+      "of": 18,
+      "rate": 1.0,
+      "baseline": 0.688
+    },
+    {
+      "when": "warum machen wir das",
+      "when_heading": "Warum machen wir das?",
+      "then": "relevante informationen",
+      "then_heading": "Relevante Informationen",
+      "count": 18,
+      "of": 22,
+      "rate": 0.818,
+      "baseline": 0.562
+    },
+    {
+      "when": "akzeptanzkriterien",
+      "when_heading": "Akzeptanzkriterien",
+      "then": "warum machen wir das",
+      "then_heading": "Warum machen wir das?",
+      "count": 15,
+      "of": 16,
+      "rate": 0.938,
+      "baseline": 0.688
+    }
+  ],
+  "discriminative": {},
+  "chars_median": 727.5,
+  "chars_p25": 516.0,
+  "chars_p75": 845.0,
+  "title_words_median": 5.0,
+  "title_prefixes": [
+    [
+      "OFLB -",
+      0.062
+    ],
+    [
+      "PoC -",
+      0.031
+    ],
+    [
+      "UX/",
+      0.031
+    ],
+    [
+      "JSON-",
+      0.031
+    ],
+    [
+      "Bug:",
+      0.031
+    ]
+  ],
+  "label_rate": 0.969,
+  "labels_per_ticket_median": 2.0,
+  "common_labels": [
+    [
+      "baustein::leistung",
+      0.469
+    ],
+    [
+      "Test",
+      0.344
+    ],
+    [
+      "baustein::datenfelder",
+      0.312
+    ],
+    [
+      "Peer Review",
+      0.25
+    ],
+    [
+      "Bug",
+      0.219
+    ],
+    [
+      "uiux",
+      0.094
+    ],
+    [
+      "In Bearbeitung",
+      0.094
+    ],
+    [
+      "baustein::Prozesse",
+      0.031
+    ],
+    [
+      "Feedbackgruppe",
+      0.031
+    ],
+    [
+      "visPM",
+      0.031
+    ]
+  ],
+  "label_groups": [
+    "baustein"
+  ],
+  "list_rate": 0.688,
+  "checkbox_rate": 0.25,
+  "code_rate": 0.031,
+  "image_rate": 0.219,
+  "link_rate": 0.281,
+  "cross_ref_rate": 0.156,
+  "assignee_rate": 0.969,
+  "language": "de",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.opencode.de",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}
