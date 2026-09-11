@@ -5,7 +5,7 @@
 ![CLI commands](https://img.shields.io/badge/CLI%20commands-11-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
 
-![tests](https://img.shields.io/badge/tests-451-238636?style=for-the-badge&labelColor=22272e)
+![tests](https://img.shields.io/badge/tests-464-238636?style=for-the-badge&labelColor=22272e)
 ![coverage](https://img.shields.io/badge/coverage-93%25-238636?style=for-the-badge&labelColor=22272e)
 ![python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-484f58?style=for-the-badge&labelColor=22272e&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-484f58?style=for-the-badge&labelColor=22272e)
@@ -341,6 +341,31 @@ invented**, because people rarely add a heading their board has never seen and
 models do it constantly. The other is spread: one number per case reads as
 precision a non-deterministic writer cannot support, so `--repeats` exists and
 the report prints the deviation next to the mean.
+
+### The judge, and why its number never travels alone
+
+Counting cannot say whether the prose is about the title, and that is the
+failure worth catching: a draft can carry every section, hit the length, take
+the right labels and describe something else entirely. `review_draft` gives it
+full marks.
+
+`--judge` asks a model that one question and nothing else. Not "is this a good
+ticket" - that is the question this tool exists to replace with counts.
+
+```bash
+ticket-ai eval --judge --labels evals/labels.jsonl
+python tools/label_drafts.py evals/results/latest.jsonl   # collect the labels
+```
+
+**Raw agreement is close to useless on its own.** If nine drafts in ten are on
+topic, a judge that answers "on topic" every time agrees ninety percent of the
+time and has learned nothing. Cohen's kappa subtracts the agreement two people
+guessing at those rates would reach, so that judge scores zero.
+
+The labels come from a person and there is no way around it. A calibration
+whose human half was generated compares one model to another. Without
+`--labels`, the judge line prints `uncalibrated` every time rather than
+documenting the caveat once and letting the number travel without it.
 
 [**evals/README.md**](evals/README.md) has the rules about what may become a
 case. Public boards only.
