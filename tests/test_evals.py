@@ -1083,3 +1083,66 @@ def test_the_html_page_carries_the_same_columns():
     assert "alignment / theirs" in html
     assert "coverage / theirs" in html
     assert "total (pooled)" in html
+
+
+# ------------------------------ the real dataset, guarded without a model
+
+
+class StubWriter:
+    """One fixed English paragraph, no headings. A floor, not a model."""
+
+    name = "stub"
+    model = "stub-1"
+
+    def write(self, system: str, prompt: str) -> str:
+        return "The label printing stops after ten positions. " * 20
+
+
+def _real_suite():
+    from ticket_ai_mcp.evals import load_suite as real_load_suite
+
+    boards = real_load_suite()
+    return boards, score(boards, run_suite(boards, StubWriter()))
+
+
+def test_the_whole_dataset_runs_through_compose():
+    # 134 cases in about a tenth of a second, because the writer is a stub.
+    # Cheap enough to guard on every push, and it is the only test that puts
+    # every real profile through the real compose.
+    boards, report = _real_suite()
+    assert report.runs == sum(len(b.cases) for b in boards)
+    assert report.failed == 0
+    assert report.pooled is not None
+
+
+def test_the_stub_covers_none_of_any_skeleton():
+    # Structural rather than a pinned float, so adding a board does not break
+    # it. If this ever passes with a number above zero, coverage is broken:
+    # the stub writes no headings at all.
+    _, report = _real_suite()
+    sectioned = [b for b in report.boards if b.coverage is not None]
+    assert sectioned, "the dataset has no board with a skeleton"
+    assert all(b.coverage.mean == 0.0 for b in sectioned)
+
+
+def test_the_stub_still_beats_real_tickets_somewhere():
+    # Pinning a documented defect, not an achievement. alignment is the share
+    # of *applicable* checks passed and a draft decides which apply, so a draft
+    # that writes nothing can outscore the board's own tickets. If this test
+    # starts failing, the defect is fixed and docs/evaluating-compose.md is
+    # stale.
+    _, report = _real_suite()
+    inverted = [
+        b.board
+        for b in report.boards
+        if b.alignment and b.human and b.alignment.mean > b.human.mean
+    ]
+    assert inverted, "alignment no longer inverts anywhere - update the docs"
+
+
+def test_pooling_matters_on_this_dataset():
+    # If these ever agree, the boards run equal numbers of checks and the
+    # weighting is doing nothing.
+    _, report = _real_suite()
+    assert report.alignment is not None and report.pooled is not None
+    assert report.pooled < report.alignment.mean
