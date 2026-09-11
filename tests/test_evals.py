@@ -17,6 +17,13 @@ from dataclasses import replace
 import pytest
 
 from ticket_ai_mcp.evals.baseline import Baseline, compare
+from ticket_ai_mcp.evals.calibration import (
+    Label,
+    agreement,
+    cohens_kappa,
+    load_labels,
+    render_agreement,
+)
 from ticket_ai_mcp.evals.dataset import (
     Board,
     Case,
@@ -25,6 +32,8 @@ from ticket_ai_mcp.evals.dataset import (
     load_suite,
     write_board,
 )
+from ticket_ai_mcp.evals.judge import Verdict as JudgeVerdict
+from ticket_ai_mcp.evals.judge import judge_runs, parse
 from ticket_ai_mcp.evals.metrics import (
     Spread,
     invented_sections,
@@ -552,3 +561,103 @@ def test_markdown_carries_the_verdict():
     base = Baseline.of(_report(alignment=0.90))
     md = render_markdown(_report(alignment=0.60), compare(_report(alignment=0.60), base))
     assert "**FAIL**" in md
+
+
+# ----------------------------------------------------------------------- judge
+
+
+def test_a_verdict_is_pulled_out_of_surrounding_prose():
+    answer = 'Sure!\n```json\n{"verdict": "partly", "why": "mentions it once"}\n```\nHope that helps'
+    assert parse(answer) == ("partly", "mentions it once")
+
+
+def test_a_verdict_outside_the_three_words_is_an_error_not_a_guess():
+    # Rounding "mostly on topic" to "on_topic" would put an invention into the
+    # agreement figure that the calibration exists to measure.
+    with pytest.raises(ValueError, match="is not one of"):
+        parse('{"verdict": "mostly on topic"}')
+
+
+def test_an_answer_with_no_json_says_what_came_back():
+    with pytest.raises(ValueError, match="no JSON object"):
+        parse("I think it is fine, honestly")
+
+
+def test_judging_skips_failed_runs_rather_than_calling_them_off_topic():
+    board = _board(cases=(_case("#1"),))
+    runs = [replace(_run("#1"), body=""), _run("#1", body="It stops after ten positions.")]
+    writer = FixedWriter('{"verdict": "on_topic", "why": "yes"}')
+    out = list(judge_runs(runs, [board], writer))
+    assert len(out) == 1
+    assert writer.calls == 1
+
+
+def test_a_judge_that_answers_nonsense_becomes_a_record():
+    board = _board(cases=(_case("#1"),))
+    out = list(judge_runs([_run("#1")], [board], FixedWriter("no idea")))
+    assert not out[0].ok
+    assert "no JSON object" in out[0].error
+
+
+# ----------------------------------------------------------------- calibration
+
+
+def test_a_judge_that_always_says_the_same_thing_scores_zero_not_ninety():
+    # Nine on-topic drafts in ten, and a judge that answers on_topic every
+    # time: 90% raw agreement, and nothing learned.
+    pairs = [("on_topic", "on_topic")] * 9 + [("off_topic", "on_topic")]
+    assert cohens_kappa(pairs) == 0.0
+
+
+def test_perfect_agreement_over_two_categories_is_one():
+    pairs = [("on_topic", "on_topic")] * 5 + [("off_topic", "off_topic")] * 5
+    assert cohens_kappa(pairs) == 1.0
+
+
+def test_kappa_is_undefined_when_everyone_used_one_category():
+    # Expected agreement is 1.0, so every answer would be perfect agreement.
+    # That is a fact about the sample, not about the judge.
+    assert cohens_kappa([("on_topic", "on_topic")] * 20) is None
+    assert cohens_kappa([]) is None
+
+
+def test_disagreement_worse_than_chance_goes_negative():
+    pairs = [("on_topic", "off_topic")] * 5 + [("off_topic", "on_topic")] * 5
+    kappa = cohens_kappa(pairs)
+    assert kappa is not None and kappa < 0
+
+
+def test_agreement_reports_what_only_one_side_saw():
+    labels = [Label("acme", "#1", 0, "on_topic"), Label("acme", "#2", 0, "partly")]
+    verdicts = [
+        JudgeVerdict("acme", "#1", 0, "on_topic"),
+        JudgeVerdict("acme", "#3", 0, "partly"),
+    ]
+    result = agreement(labels, verdicts)
+    assert result.pairs == 1
+    assert result.labelled_only == 1
+    assert result.judged_only == 1
+
+
+def test_a_broken_judge_record_is_not_compared():
+    labels = [Label("acme", "#1", 0, "on_topic")]
+    verdicts = [JudgeVerdict("acme", "#1", 0, "", error="no JSON object")]
+    assert agreement(labels, verdicts).pairs == 0
+
+
+def test_the_kappa_band_is_named_and_a_thin_sample_says_so():
+    labels = [Label("acme", f"#{i}", 0, "on_topic" if i % 2 else "off_topic") for i in range(10)]
+    verdicts = [JudgeVerdict(label.board, label.case, 0, label.verdict) for label in labels]
+    result = agreement(labels, verdicts)
+    assert result.verdict == "almost perfect"
+    assert "too few to quote" in render_agreement(result)
+
+
+def test_labels_are_read_from_a_file_with_the_line_number_on_errors(tmp_path):
+    path = tmp_path / "labels.jsonl"
+    path.write_text(
+        '{"board": "acme", "case": "#1", "repeat": 0, "verdict": "on_topic"}\n{"board"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=r"labels\.jsonl:2"):
+        load_labels(path)

@@ -279,6 +279,28 @@ def cmd_eval(args: argparse.Namespace) -> int:
         verdict = compare(report, Baseline.load(baseline_path), tolerance=args.tolerance)
 
     print(render_markdown(report, verdict) if args.markdown else render(report, verdict))
+
+    if args.judge:
+        from .evals.calibration import agreement, load_labels, render_agreement
+        from .evals.judge import judge_runs
+
+        judge_writer = writer_for(args.writer, args.model)
+        if judge_writer is None:
+            print("no model configured, so nothing can judge", file=sys.stderr)
+            return 2
+        verdicts = list(judge_runs(runs, boards, judge_writer))
+        on_topic = sum(1 for v in verdicts if v.verdict == "on_topic")
+        judged = sum(1 for v in verdicts if v.ok)
+        print("")
+        print(f"  judge        {on_topic}/{judged} on topic")
+        if args.labels:
+            print(render_agreement(agreement(load_labels(Path(args.labels)), verdicts)))
+        else:
+            # Said every time rather than documented once. The figure above is
+            # the one that gets pasted into a message, and it should not travel
+            # without this line.
+            print("  uncalibrated: no --labels given, so this figure is an opinion")
+
     return 0 if (verdict is None or verdict.ok) else 1
 
 
@@ -509,6 +531,8 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--update-baseline", action="store_true", help="write the baseline instead")
     ev.add_argument("--tolerance", type=float, default=TOLERANCE_DEFAULT)
     ev.add_argument("--markdown", action="store_true", help="a table for a pull request")
+    ev.add_argument("--judge", action="store_true", help="also ask a model if drafts are on topic")
+    ev.add_argument("--labels", help="human labels to calibrate the judge against")
     ev.add_argument("--writer")
     ev.add_argument("--model")
     ev.set_defaults(func=cmd_eval)
