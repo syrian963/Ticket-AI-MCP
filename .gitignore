@@ -14,3 +14,8 @@ htmlcov/
 # calls against somebody else's boards - useful to read, not something to
 # carry in the repository.
 fleet.json
+
+# Eval run records. The dataset is committed, the results of running it are not:
+# they are produced per machine and per model, and a diff of two of them is not
+# something anyone reads in a pull request.
+evals/results/

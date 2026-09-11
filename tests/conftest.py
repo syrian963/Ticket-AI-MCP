@@ -8,7 +8,15 @@ them to make a point about one is a test nobody reads.
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+# `tools/` is not a package and is not installed - it holds scripts that are
+# run by hand. The eval dataset builder has two pure functions worth testing,
+# so the repository root goes on the path rather than those functions moving
+# into the package to suit the test.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
