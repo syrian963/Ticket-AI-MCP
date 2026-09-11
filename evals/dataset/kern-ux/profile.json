@@ -1,0 +1,332 @@
+{
+  "project": "kern-ux/pattern-library",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T14:16:03.274836+00:00",
+  "sample_size": 28,
+  "exemplar_keys": [
+    "#1000",
+    "#1003",
+    "#1007",
+    "#1008",
+    "#1012",
+    "#1017",
+    "#1018",
+    "#1019",
+    "#1039",
+    "#1057",
+    "#1085",
+    "#1087",
+    "#1091",
+    "#1101",
+    "#1102",
+    "#276",
+    "#304",
+    "#375",
+    "#508",
+    "#511",
+    "#516",
+    "#743",
+    "#801",
+    "#916",
+    "#992",
+    "#489",
+    "#996",
+    "#735"
+  ],
+  "sections": [
+    {
+      "heading": "Akzeptanzkriterien",
+      "key": "akzeptanzkriterien",
+      "count": 11,
+      "rate": 0.393,
+      "position": 2.45
+    },
+    {
+      "heading": "Beschreibung",
+      "key": "beschreibung",
+      "count": 9,
+      "rate": 0.321,
+      "position": 1.22
+    },
+    {
+      "heading": "Aufgaben",
+      "key": "aufgaben",
+      "count": 8,
+      "rate": 0.286,
+      "position": 0.75
+    },
+    {
+      "heading": "Bemerkungen",
+      "key": "bemerkungen",
+      "count": 6,
+      "rate": 0.214,
+      "position": 3.83
+    },
+    {
+      "heading": "Zusammenfassung",
+      "key": "zusammenfassung",
+      "count": 6,
+      "rate": 0.214,
+      "position": 0.5
+    },
+    {
+      "heading": "Schritte zur Reproduktion",
+      "key": "schritte zur reproduktion",
+      "count": 6,
+      "rate": 0.214,
+      "position": 3.5
+    },
+    {
+      "heading": "Aktuelles Fehlverhalten",
+      "key": "aktuelles fehlverhalten",
+      "count": 6,
+      "rate": 0.214,
+      "position": 5.5
+    },
+    {
+      "heading": "Erwartetes korrektes Verhalten",
+      "key": "erwartetes korrektes verhalten",
+      "count": 6,
+      "rate": 0.214,
+      "position": 6.5
+    },
+    {
+      "heading": "Mögliche Lösungen",
+      "key": "mogliche losungen",
+      "count": 6,
+      "rate": 0.214,
+      "position": 8.83
+    },
+    {
+      "heading": "Wichtigkeit",
+      "key": "wichtigkeit",
+      "count": 5,
+      "rate": 0.179,
+      "position": 3.2
+    },
+    {
+      "heading": "Relevante Logs und/oder Screenshots",
+      "key": "relevante logs und oder screenshots",
+      "count": 5,
+      "rate": 0.179,
+      "position": 7.6
+    },
+    {
+      "heading": "Definition of Ready",
+      "key": "definition of ready",
+      "count": 5,
+      "rate": 0.179,
+      "position": 1.0
+    },
+    {
+      "heading": "Definition of Done",
+      "key": "definition of done",
+      "count": 5,
+      "rate": 0.179,
+      "position": 4.8
+    },
+    {
+      "heading": "Verwendetes KERN Kit",
+      "key": "verwendetes kern kit",
+      "count": 4,
+      "rate": 0.143,
+      "position": 1.5
+    },
+    {
+      "heading": "Verwendete Kit-Version",
+      "key": "verwendete kit version",
+      "count": 4,
+      "rate": 0.143,
+      "position": 2.5
+    },
+    {
+      "heading": "Beispiel",
+      "key": "beispiel",
+      "count": 4,
+      "rate": 0.143,
+      "position": 5.0
+    },
+    {
+      "heading": "User Story",
+      "key": "user story",
+      "count": 4,
+      "rate": 0.143,
+      "position": 0.5
+    },
+    {
+      "heading": "ToDo",
+      "key": "todo",
+      "count": 3,
+      "rate": 0.107,
+      "position": 1.0
+    },
+    {
+      "heading": "Gestaltung",
+      "key": "gestaltung",
+      "count": 2,
+      "rate": 0.071,
+      "position": 0.0
+    },
+    {
+      "heading": "KERN Komponenten Design-Prozess",
+      "key": "kern komponenten design prozess",
+      "count": 2,
+      "rate": 0.071,
+      "position": 0.0
+    },
+    {
+      "heading": "Verwendeter Browser",
+      "key": "verwendeter browser",
+      "count": 2,
+      "rate": 0.071,
+      "position": 3.0
+    },
+    {
+      "heading": "Story Satz",
+      "key": "story satz",
+      "count": 2,
+      "rate": 0.071,
+      "position": 2.0
+    },
+    {
+      "heading": "Beschreibung und wichtige Hinweise",
+      "key": "beschreibung und wichtige hinweise",
+      "count": 2,
+      "rate": 0.071,
+      "position": 4.0
+    },
+    {
+      "heading": "Bugmeldung für allgemeine Fehler",
+      "key": "bugmeldung fur allgemeine fehler",
+      "count": 2,
+      "rate": 0.071,
+      "position": 0.0
+    }
+  ],
+  "conditionals": [
+    {
+      "when": "beschreibung",
+      "when_heading": "Beschreibung",
+      "then": "akzeptanzkriterien",
+      "then_heading": "Akzeptanzkriterien",
+      "count": 8,
+      "of": 9,
+      "rate": 0.889,
+      "baseline": 0.393
+    },
+    {
+      "when": "akzeptanzkriterien",
+      "when_heading": "Akzeptanzkriterien",
+      "then": "beschreibung",
+      "then_heading": "Beschreibung",
+      "count": 8,
+      "of": 11,
+      "rate": 0.727,
+      "baseline": 0.321
+    }
+  ],
+  "discriminative": {},
+  "chars_median": 1007.5,
+  "chars_p25": 691.0,
+  "chars_p75": 1678.0,
+  "title_words_median": 6.0,
+  "title_prefixes": [
+    [
+      "Nutzer:",
+      0.071
+    ],
+    [
+      "Branding :",
+      0.036
+    ],
+    [
+      "Kopfzeile:",
+      0.036
+    ],
+    [
+      "Card-",
+      0.036
+    ],
+    [
+      "FEATURE:",
+      0.036
+    ]
+  ],
+  "label_rate": 0.893,
+  "labels_per_ticket_median": 2.5,
+  "common_labels": [
+    [
+      "Design",
+      0.571
+    ],
+    [
+      "Entwicklung",
+      0.321
+    ],
+    [
+      "Issue::ToDo",
+      0.321
+    ],
+    [
+      "In Bearbeitung",
+      0.179
+    ],
+    [
+      "Prio::3-Mittel",
+      0.143
+    ],
+    [
+      "Intern",
+      0.143
+    ],
+    [
+      "Produkt-Backlog",
+      0.143
+    ],
+    [
+      "Bug",
+      0.143
+    ],
+    [
+      "Prio::2-Hoch",
+      0.143
+    ],
+    [
+      "Bereit für Release",
+      0.071
+    ],
+    [
+      "Finales Review",
+      0.071
+    ],
+    [
+      "Issue::Story",
+      0.071
+    ]
+  ],
+  "label_groups": [
+    "Issue",
+    "Prio"
+  ],
+  "list_rate": 0.893,
+  "checkbox_rate": 0.571,
+  "code_rate": 0.036,
+  "image_rate": 0.179,
+  "link_rate": 0.5,
+  "cross_ref_rate": 0.214,
+  "assignee_rate": 0.679,
+  "language": "de",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.opencode.de",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}

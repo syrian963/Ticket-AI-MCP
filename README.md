@@ -5,7 +5,7 @@
 ![CLI commands](https://img.shields.io/badge/CLI%20commands-11-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
 
-![tests](https://img.shields.io/badge/tests-464-238636?style=for-the-badge&labelColor=22272e)
+![tests](https://img.shields.io/badge/tests-466-238636?style=for-the-badge&labelColor=22272e)
 ![coverage](https://img.shields.io/badge/coverage-93%25-238636?style=for-the-badge&labelColor=22272e)
 ![python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-484f58?style=for-the-badge&labelColor=22272e&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-484f58?style=for-the-badge&labelColor=22272e)
@@ -366,6 +366,13 @@ The labels come from a person and there is no way around it. A calibration
 whose human half was generated compares one model to another. Without
 `--labels`, the judge line prints `uncalibrated` every time rather than
 documenting the caveat once and letting the number travel without it.
+
+The dataset is 72 cases over five public boards, one of them German
+(`kern-ux/pattern-library` on gitlab.opencode.de, skeleton `Beschreibung` and
+`Akzeptanzkriterien`). That board is why `jsonl_lines` exists: one of its
+tickets carries a literal U+2028, `str.splitlines` treats that as a line break
+and `json.dumps` does not escape it, so a valid file read as a truncated record
+and the error blamed the file.
 
 [**evals/README.md**](evals/README.md) has the rules about what may become a
 case. Public boards only.
