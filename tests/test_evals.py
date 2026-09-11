@@ -38,6 +38,7 @@ from ticket_ai_mcp.evals.judge import Verdict as JudgeVerdict
 from ticket_ai_mcp.evals.judge import judge_runs, parse
 from ticket_ai_mcp.evals.metrics import (
     Spread,
+    ceiling,
     invented_sections,
     score,
     score_board,
@@ -436,6 +437,7 @@ def _report(
                 failed=failed,
                 alignment=Spread.of([value, value]),
                 checks=Spread.of([float(checks), float(checks)]),
+                human=Spread.of([0.9, 0.9]),
                 per_case_stdev=None,
                 seconds=None,
                 revised=0.0,
@@ -926,3 +928,26 @@ def test_a_report_with_no_checks_at_all_has_no_pooled_figure():
     # everything passing.
     assert report.pooled is None
     assert report.checks == 0
+
+
+def test_the_ceiling_is_the_board_own_tickets_not_one_point_oh(tmp_path):
+    # A reference that satisfies the profile scores well; one that does not
+    # scores badly. Either way the figure comes from real text, not from an
+    # assumption that a perfect draft exists.
+    board = _board_with_sections("Summary")
+    good = replace(_case("#1"), reference="## Summary\n" + ("It stops after ten. " * 40))
+    poor = replace(_case("#2"), reference="broken")
+    board = replace(board, cases=(good, poor))
+
+    spread = ceiling(board)
+    assert spread is not None
+    assert spread.n == 2
+    assert spread.low < spread.high
+
+
+def test_the_ceiling_reaches_the_report_and_the_render():
+    board = _board_with_sections("Summary")
+    report = score([board], [_run()])
+    assert report.boards[0].human is not None
+    assert "human" in render(report)
+    assert "own tickets" in render(report)
