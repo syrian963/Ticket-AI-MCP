@@ -127,6 +127,68 @@ board. The gate compares across ten, so it uses the pooled figure, and every
 board line prints its check count next to its score: 1.000 over two checks and
 1.000 over nine are not the same claim, and only that line says so.
 
+## What the harness found: alignment can be raised by writing less
+
+Two figures per board, neither needing a model. **stub** is a fixed English
+paragraph with no headings, put through `compose`. **human** is what the board's
+own shipped tickets score against the board's own profile.
+
+| Board | Checks | Stub | Human | Gap |
+|---|---|---|---|---|
+| inkscape | 9 | 0.381 | 0.945 | +0.564 |
+| kafka | 2 | 0.500 | 0.786 | +0.286 |
+| fitko-fim | 5 | 0.554 | 0.828 | +0.274 |
+| kern-ux | 3 | 0.549 | 0.761 | +0.212 |
+| fdroid | 3 | 0.800 | 0.902 | +0.101 |
+| gitlab-runner | 7 | 0.923 | 0.886 | **−0.037** |
+| gitlab-cli | 5 | 0.963 | 0.887 | **−0.075** |
+| cassandra | 2 | 1.000 | 0.875 | **−0.125** |
+| hibernate | 2 | 1.000 | 0.850 | **−0.150** |
+| veloren | 2 | 1.000 | 0.700 | **−0.300** |
+
+**On five boards of ten, meaningless text outscores the people whose board it
+is.** Not only on the two-check boards: gitlab-cli runs five checks and
+gitlab-runner seven.
+
+### The mechanism, on gitlab-cli
+
+Same title, same profile, three drafts:
+
+| Draft | Checks that applied | Alignment |
+|---|---|---|
+| no headings at all | 5 | **1.000** |
+| one skeleton heading | 5 | **1.000** |
+| two skeleton headings | 10 | **0.600** |
+
+Writing more of what the board asks for makes the score go **down**.
+
+`alignment` is the share of *applicable* checks a draft passed, and a draft
+decides which checks apply to it. Most of gitlab-cli's skeleton comes from
+conditional pairs, and a conditional only becomes applicable once one half of
+the pair is present. Write neither half and the rule never fires; write one and
+it fires against you.
+
+This is not a fault in the harness. It is `review_draft` being measured against
+something it had not been measured against before, and it is the reason the
+report prints **checks** and **human** on every board line. A score without its
+denominator, next to what people on that board actually achieve, is not a
+score.
+
+### What follows
+
+**The reference point is the human figure, not 1.0.** A model at 0.85 on
+inkscape is at the level of that board's own tickets; the same 0.85 on
+hibernate is below a stub.
+
+**The human ceiling is not 1.0 anywhere**, ranging from 0.700 to 0.945. Most of
+the gap is `short_description`, which fires below the corpus's 25th percentile,
+and a quarter of any corpus sits below its own 25th percentile by construction.
+
+**Whether `alignment` should be redefined is not the harness's decision.** It
+is the tool's central number, quoted in the README and returned by the MCP
+server, and changing it changes every claim built on it. The harness's job was
+to make the property visible, and it is now on every report.
+
 ## The gate tolerates noise on purpose
 
 `evals/baseline.json` holds a committed figure, and a drop has to exceed **0.05

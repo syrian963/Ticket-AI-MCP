@@ -39,6 +39,7 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from ..review import review_draft
 from ..textstats import headings, language, normalise_heading
 from .dataset import Board
 from .runner import CaseRun
@@ -109,6 +110,30 @@ def wrong_language(body: str, board: Board) -> bool:
     return bool(guessed and board.language and guessed != board.language)
 
 
+def ceiling(board: Board) -> Spread | None:
+    """What the board's own shipped tickets score against the board's profile.
+
+    Nothing here involves a model. Each case carries the description a person
+    really wrote, and this puts it through the same `review_draft` a draft gets.
+
+    **The answer is not 1.0 and it is not meant to be.** Ranging from 0.70 to
+    0.95 across this dataset, mostly because `short_description` fires on
+    anything below the corpus's 25th percentile and a quarter of any corpus is
+    below its own 25th percentile by construction. A board's conditional pairs
+    add to it: a ticket that is a feature rather than a bug does not carry the
+    bug form's sections and is marked down for it.
+
+    It matters because the alternative reference point is 1.0, and against 1.0
+    a model at 0.85 reads as fifteen points short of perfect when it is in fact
+    at the level of the people whose board it is.
+    """
+    scores = [
+        review_draft(case.title, case.reference, board.profile, labels=case.labels).alignment
+        for case in board.cases
+    ]
+    return Spread.of(s for s in scores if s is not None)
+
+
 @dataclass(frozen=True, slots=True)
 class BoardReport:
     """One board, summarised over however many runs it got."""
@@ -119,6 +144,8 @@ class BoardReport:
     failed: int
     alignment: Spread | None
     checks: Spread | None
+    # What the board's own tickets score. See `ceiling`.
+    human: Spread | None
     per_case_stdev: Spread | None
     seconds: Spread | None
     revised: float
@@ -184,6 +211,7 @@ def score_board(board: Board, runs: list[CaseRun]) -> BoardReport:
         failed=failed,
         alignment=Spread.of(r.alignment or 0.0 for r in good),
         checks=Spread.of(float(r.checks_run) for r in good),
+        human=ceiling(board),
         per_case_stdev=Spread.of(spreads),
         seconds=Spread.of(r.seconds for r in good),
         revised=_rate(sum(1 for r in good if r.attempts > 1), len(good)),

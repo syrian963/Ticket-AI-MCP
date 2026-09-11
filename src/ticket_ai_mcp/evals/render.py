@@ -47,6 +47,11 @@ def _board_lines(board: BoardReport) -> list[str]:
             f"    checks       {board.checks.median:.0f} per draft "
             f"[{board.checks.low:.0f}-{board.checks.high:.0f}]"
         )
+    if board.human is not None:
+        lines.append(
+            f"    human        {board.human.mean:.3f} on this board's own tickets "
+            f"[{board.human.low:.2f}-{board.human.high:.2f}]"
+        )
     if board.per_case_stdev is not None:
         lines.append(
             f"    same case    ±{board.per_case_stdev.mean:.3f} on average "
