@@ -393,7 +393,7 @@ The cheap half runs on every pull request that touches the harness: every board
 loads, no case is also an exemplar, and a committed results file is re-scored.
 No model, so it costs seconds.
 
-The suite itself is `workflow_dispatch`. Composing 55 cases is minutes and
+The suite itself is `workflow_dispatch`. Composing 121 cases is minutes and
 money, and paying for it on a branch about a README typo buys nothing.
 
 `terraform/` is the report's address: an S3 bucket behind CloudFront, and an
