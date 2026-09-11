@@ -367,11 +367,11 @@ whose human half was generated compares one model to another. Without
 `--labels`, the judge line prints `uncalibrated` every time rather than
 documenting the caveat once and letting the number travel without it.
 
-The dataset is 99 cases over seven public boards. **Thirty are German**, from
+The dataset is 109 cases over eight public boards. **Thirty are German**, from
 `kern-ux/pattern-library` and `fitko/fim/portal` on gitlab.opencode.de, a public
-German GitLab that reads without a token. One board is Jira (`KAFKA` on
-issues.apache.org), and two boards write **pure prose with no recurring sections
-at all**.
+German GitLab that reads without a token. Two boards are Jira (`KAFKA` on
+issues.apache.org and `HHH` on hibernate.atlassian.net), and three write **pure
+prose with no recurring sections at all**.
 
 That is not variety for its own sake. `compose` branches on each of them: a
 German prompt, a tracker abstraction, and a skeleton block that either lists

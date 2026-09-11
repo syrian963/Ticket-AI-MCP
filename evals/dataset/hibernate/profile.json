@@ -1,0 +1,123 @@
+{
+  "project": "HHH",
+  "tracker": "jira",
+  "built_at": "2026-09-11T15:49:11.404933+00:00",
+  "sample_size": 35,
+  "exemplar_keys": [
+    "HHH-20452",
+    "HHH-20696",
+    "HHH-20788",
+    "HHH-20343",
+    "HHH-20661",
+    "HHH-20806",
+    "HHH-19566",
+    "HHH-20467",
+    "HHH-20772",
+    "HHH-12867",
+    "HHH-19586",
+    "HHH-20438",
+    "HHH-20583",
+    "HHH-20614",
+    "HHH-20648",
+    "HHH-20697",
+    "HHH-20721",
+    "HHH-20779",
+    "HHH-20801",
+    "HHH-20817",
+    "HHH-20833",
+    "HHH-20862",
+    "HHH-20509",
+    "HHH-20650",
+    "HHH-20659",
+    "HHH-20671",
+    "HHH-20678",
+    "HHH-20708",
+    "HHH-20719",
+    "HHH-20731",
+    "HHH-20738",
+    "HHH-20749",
+    "HHH-20802",
+    "HHH-20842",
+    "HHH-19486"
+  ],
+  "sections": [
+    {
+      "heading": "Expected behavior",
+      "key": "expected behavior",
+      "count": 3,
+      "rate": 0.086,
+      "position": 2.33
+    },
+    {
+      "heading": "Root cause",
+      "key": "root cause",
+      "count": 2,
+      "rate": 0.057,
+      "position": 2.0
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 2,
+      "rate": 0.057,
+      "position": 1.0
+    },
+    {
+      "heading": "Problem",
+      "key": "problem",
+      "count": 2,
+      "rate": 0.057,
+      "position": 0.0
+    }
+  ],
+  "conditionals": [],
+  "discriminative": {},
+  "chars_median": 932.0,
+  "chars_p25": 645.0,
+  "chars_p75": 1598.0,
+  "title_words_median": 9.0,
+  "title_prefixes": [
+    [
+      "Basic-",
+      0.029
+    ],
+    [
+      "Envers:",
+      0.029
+    ]
+  ],
+  "label_rate": 0.114,
+  "labels_per_ticket_median": 0.0,
+  "common_labels": [
+    [
+      "good-first-issue",
+      0.029
+    ],
+    [
+      "query",
+      0.029
+    ],
+    [
+      "regression",
+      0.029
+    ],
+    [
+      "hibernate-orm",
+      0.029
+    ],
+    [
+      "annotation-processor",
+      0.029
+    ]
+  ],
+  "label_groups": [],
+  "list_rate": 0.657,
+  "checkbox_rate": 0.0,
+  "code_rate": 0.514,
+  "image_rate": 0.0,
+  "link_rate": 0.486,
+  "cross_ref_rate": 0.057,
+  "assignee_rate": 0.943,
+  "language": "en",
+  "note_codes": []
+}
