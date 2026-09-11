@@ -367,7 +367,7 @@ whose human half was generated compares one model to another. Without
 `--labels`, the judge line prints `uncalibrated` every time rather than
 documenting the caveat once and letting the number travel without it.
 
-The dataset is 121 cases over nine public boards. **Thirty are German**, from
+The dataset is 134 cases over ten public boards. **Thirty are German**, from
 `kern-ux/pattern-library` and `fitko/fim/portal` on gitlab.opencode.de, a public
 German GitLab that reads without a token. Three boards are Jira (`KAFKA` and `CASSANDRA` on issues.apache.org, `HHH`
 on hibernate.atlassian.net), and four write **pure prose with no recurring
@@ -393,7 +393,7 @@ The cheap half runs on every pull request that touches the harness: every board
 loads, no case is also an exemplar, and a committed results file is re-scored.
 No model, so it costs seconds.
 
-The suite itself is `workflow_dispatch`. Composing 121 cases is minutes and
+The suite itself is `workflow_dispatch`. Composing 134 cases is minutes and
 money, and paying for it on a branch about a README typo buys nothing.
 
 `terraform/` is the report's address: an S3 bucket behind CloudFront, and an
