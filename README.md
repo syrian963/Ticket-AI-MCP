@@ -2,10 +2,10 @@
 
 ![release](https://img.shields.io/badge/release-v0.1.1-1f6feb?style=for-the-badge&labelColor=22272e)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-8-8957e5?style=for-the-badge&labelColor=22272e)
-![CLI commands](https://img.shields.io/badge/CLI%20commands-10-8957e5?style=for-the-badge&labelColor=22272e)
+![CLI commands](https://img.shields.io/badge/CLI%20commands-11-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
 
-![tests](https://img.shields.io/badge/tests-424-238636?style=for-the-badge&labelColor=22272e)
+![tests](https://img.shields.io/badge/tests-451-238636?style=for-the-badge&labelColor=22272e)
 ![coverage](https://img.shields.io/badge/coverage-93%25-238636?style=for-the-badge&labelColor=22272e)
 ![python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-484f58?style=for-the-badge&labelColor=22272e&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-484f58?style=for-the-badge&labelColor=22272e)
@@ -313,6 +313,37 @@ signal there falls back to remote links, and a board that does not post them
 cannot be split into shipped and stalled at all. It says that rather than
 reporting every ticket as stalled. That is a limit of the API, not of the
 corpus.
+
+## Measuring the part a model writes
+
+Every test in this repository mocks the writer, so none of them says anything
+about the prose that comes back. `evals/` is the answer to that: a frozen set of
+titles from public boards, each stored next to the board profile as it stood
+when the case was collected.
+
+```bash
+ticket-ai eval --baseline evals/baseline.json          # run it and mark the result
+ticket-ai eval --runs evals/results/latest.jsonl       # re-score records, no model
+ticket-ai eval --repeats 5 --markdown                  # spread, as a table for an MR
+```
+
+**The cases were held out of the profile before it was built.** A case the
+profile was fitted to flatters the model for a reason that has nothing to do
+with the model.
+
+**The runner records and does not score.** A case costs thirty to seventy
+seconds on a local model, so scoring separately is what makes a changed metric
+free to try. `--runs` is that path.
+
+Two of the figures are not in `review_draft`, deliberately. It asks whether the
+sections a board uses are present; it never asks **what else the draft
+invented**, because people rarely add a heading their board has never seen and
+models do it constantly. The other is spread: one number per case reads as
+precision a non-deterministic writer cannot support, so `--repeats` exists and
+the report prints the deviation next to the mean.
+
+[**evals/README.md**](evals/README.md) has the rules about what may become a
+case. Public boards only.
 
 ## Documentation
 

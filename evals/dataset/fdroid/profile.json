@@ -1,0 +1,224 @@
+{
+  "project": "fdroid/fdroidclient",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T14:04:50.343026+00:00",
+  "sample_size": 35,
+  "exemplar_keys": [
+    "#1403",
+    "#2413",
+    "#2785",
+    "#2879",
+    "#2944",
+    "#3273",
+    "#3339",
+    "#3370",
+    "#1096",
+    "#2119",
+    "#2238",
+    "#2700",
+    "#3324",
+    "#3330",
+    "#1767",
+    "#1970",
+    "#1551",
+    "#1975",
+    "#2611",
+    "#3074",
+    "#3079",
+    "#3272",
+    "#2425",
+    "#1860",
+    "#1879",
+    "#1904",
+    "#1916",
+    "#1921",
+    "#1929",
+    "#1930",
+    "#1931",
+    "#1960",
+    "#1967",
+    "#1996",
+    "#2576"
+  ],
+  "sections": [
+    {
+      "heading": "What did you expect to see?",
+      "key": "what did you expect to see",
+      "count": 19,
+      "rate": 0.543,
+      "position": 1.05
+    },
+    {
+      "heading": "What did you see instead?",
+      "key": "what did you see instead",
+      "count": 19,
+      "rate": 0.543,
+      "position": 2.11
+    },
+    {
+      "heading": "What did you do? (clear steps if possible)",
+      "key": "what did you do clear steps if possible",
+      "count": 18,
+      "rate": 0.514,
+      "position": 0.11
+    },
+    {
+      "heading": "What did you do?",
+      "key": "what did you do",
+      "count": 3,
+      "rate": 0.086,
+      "position": 0.0
+    }
+  ],
+  "conditionals": [
+    {
+      "when": "what did you expect to see",
+      "when_heading": "What did you expect to see?",
+      "then": "what did you see instead",
+      "then_heading": "What did you see instead?",
+      "count": 18,
+      "of": 19,
+      "rate": 0.947,
+      "baseline": 0.543
+    },
+    {
+      "when": "what did you see instead",
+      "when_heading": "What did you see instead?",
+      "then": "what did you expect to see",
+      "then_heading": "What did you expect to see?",
+      "count": 18,
+      "of": 19,
+      "rate": 0.947,
+      "baseline": 0.543
+    },
+    {
+      "when": "what did you do clear steps if possible",
+      "when_heading": "What did you do? (clear steps if possible)",
+      "then": "what did you see instead",
+      "then_heading": "What did you see instead?",
+      "count": 17,
+      "of": 18,
+      "rate": 0.944,
+      "baseline": 0.543
+    },
+    {
+      "when": "what did you see instead",
+      "when_heading": "What did you see instead?",
+      "then": "what did you do clear steps if possible",
+      "then_heading": "What did you do? (clear steps if possible)",
+      "count": 17,
+      "of": 19,
+      "rate": 0.895,
+      "baseline": 0.514
+    },
+    {
+      "when": "what did you do clear steps if possible",
+      "when_heading": "What did you do? (clear steps if possible)",
+      "then": "what did you expect to see",
+      "then_heading": "What did you expect to see?",
+      "count": 16,
+      "of": 18,
+      "rate": 0.889,
+      "baseline": 0.543
+    },
+    {
+      "when": "what did you expect to see",
+      "when_heading": "What did you expect to see?",
+      "then": "what did you do clear steps if possible",
+      "then_heading": "What did you do? (clear steps if possible)",
+      "count": 16,
+      "of": 19,
+      "rate": 0.842,
+      "baseline": 0.514
+    }
+  ],
+  "discriminative": {},
+  "chars_median": 660.0,
+  "chars_p25": 474.0,
+  "chars_p75": 1232.0,
+  "title_words_median": 8.0,
+  "title_prefixes": [
+    [
+      "[2.0]",
+      0.029
+    ],
+    [
+      "en-",
+      0.029
+    ]
+  ],
+  "label_rate": 0.629,
+  "labels_per_ticket_median": 1.0,
+  "common_labels": [
+    [
+      "ui",
+      0.171
+    ],
+    [
+      "help-wanted",
+      0.143
+    ],
+    [
+      "bug",
+      0.086
+    ],
+    [
+      "privileged installer",
+      0.086
+    ],
+    [
+      "TV",
+      0.086
+    ],
+    [
+      "waiting-on-response",
+      0.086
+    ],
+    [
+      "installer",
+      0.057
+    ],
+    [
+      "index-v2",
+      0.057
+    ],
+    [
+      "regression",
+      0.057
+    ],
+    [
+      "FFDW-DVD",
+      0.057
+    ],
+    [
+      "Calyx Institute",
+      0.057
+    ],
+    [
+      "localization",
+      0.057
+    ]
+  ],
+  "label_groups": [],
+  "list_rate": 0.829,
+  "checkbox_rate": 0.057,
+  "code_rate": 0.0,
+  "image_rate": 0.286,
+  "link_rate": 0.314,
+  "cross_ref_rate": 0.114,
+  "assignee_rate": 0.143,
+  "language": "en",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.com",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}

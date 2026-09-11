@@ -12,9 +12,11 @@ and read back.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
+from ticket_ai_mcp.evals.baseline import Baseline, compare
 from ticket_ai_mcp.evals.dataset import (
     Board,
     Case,
@@ -23,6 +25,14 @@ from ticket_ai_mcp.evals.dataset import (
     load_suite,
     write_board,
 )
+from ticket_ai_mcp.evals.metrics import (
+    Spread,
+    invented_sections,
+    score,
+    score_board,
+    wrong_language,
+)
+from ticket_ai_mcp.evals.render import render, render_markdown
 from ticket_ai_mcp.evals.runner import CaseRun, read_runs, run_case, run_suite, write_runs
 from ticket_ai_mcp.profile import Profile
 from ticket_ai_mcp.writers.base import WriterError
@@ -272,3 +282,273 @@ def test_the_split_is_stable_across_processes():
     # would split differently and the two would not be comparable.
     assert _bucket("gitlab:inkscape/inkscape:3033") == _bucket("gitlab:inkscape/inkscape:3033")
     assert _bucket("a") != _bucket("b")
+
+
+# --------------------------------------------------------------------- metrics
+
+
+def _run(case="#7", *, alignment=0.8, body="Summary\nIt stops.", attempts=1, seconds=1.0, **kw):
+    return CaseRun(
+        board="acme",
+        case=case,
+        model="fixed-1",
+        repeat=kw.pop("repeat", 0),
+        seconds=seconds,
+        attempts=attempts,
+        alignment=alignment,
+        checks_run=5,
+        body=body,
+        **kw,
+    )
+
+
+def _board_with_sections(*names):
+    from ticket_ai_mcp.profile import Section
+
+    sections = tuple(
+        Section(heading=n, key=n.lower(), count=9, rate=0.9, position=i)
+        for i, n in enumerate(names)
+    )
+    # `replace`, not `Profile(**profile.__dict__)`: these dataclasses use
+    # slots, so there is no __dict__ to unpack.
+    return replace(_board(), profile=replace(_profile(), sections=sections))
+
+
+def test_a_heading_the_board_uses_is_not_invented():
+    board = _board_with_sections("Summary", "Steps to reproduce")
+    assert invented_sections("## Summary\ntext\n## Steps to reproduce\nmore", board) == ()
+
+
+def test_a_heading_the_board_never_used_is_invented():
+    board = _board_with_sections("Summary")
+    found = invented_sections("## Summary\ntext\n## Impact\nbig", board)
+    assert found == ("Impact",)
+
+
+def test_invented_is_measured_against_every_section_not_the_skeleton():
+    # A heading used in a third of tickets is house style even though the
+    # prompt never asked for it. Counting it would punish a draft for being
+    # right.
+    from ticket_ai_mcp.profile import Section
+
+    board = _board_with_sections("Summary")
+    rare = Section(heading="Workaround", key="workaround", count=3, rate=0.3, position=2)
+    board = replace(
+        board, profile=replace(board.profile, sections=(*board.profile.sections, rare))
+    )
+    assert [h for h, _ in board.profile.skeleton()] == ["Summary"]
+    assert invented_sections("## Workaround\ndo this", board) == ()
+
+
+def test_a_prose_board_treats_every_heading_as_invented():
+    board = _board_with_sections()
+    assert invented_sections("## Anything\nx", board) == ("Anything",)
+
+
+def test_a_short_draft_is_not_accused_of_the_wrong_language():
+    # textstats.language returns None on thin evidence; that is "not wrong",
+    # not a second complaint stacked on a draft that is already too short.
+    board = _board_with_sections("Summary")
+    assert wrong_language("Too short.", board) is False
+
+
+def test_german_prose_on_an_english_board_is_wrong_language():
+    board = _board_with_sections("Summary")
+    german = (
+        "Wenn der Nutzer auf den Knopf klickt, dann wird die Liste nicht mehr "
+        "aktualisiert und die Anzeige bleibt auf dem alten Stand stehen."
+    )
+    assert wrong_language(german, board) is True
+
+
+def test_a_single_run_has_no_spread_rather_than_zero_spread():
+    spread = Spread.of([0.8])
+    assert spread is not None
+    assert spread.n == 1
+    assert spread.stdev == 0.0
+    assert spread.low == spread.high == 0.8
+
+
+def test_failed_runs_are_counted_but_kept_out_of_the_quality_figures():
+    board = _board_with_sections("Summary")
+    runs = [
+        _run(alignment=0.9),
+        _run(alignment=None, error="no model", attempts=0),
+    ]
+    report = score_board(board, runs)
+    assert report.runs == 2
+    assert report.failed == 1
+    assert report.alignment is not None
+    # 0.9, not 0.45: an outage is not a score.
+    assert report.alignment.mean == 0.9
+    assert report.alignment.n == 1
+
+
+def test_per_case_spread_needs_more_than_one_run_of_that_case():
+    board = _board_with_sections("Summary")
+    once = score_board(board, [_run("#1", alignment=0.5)])
+    assert once.per_case_stdev is None
+    twice = score_board(board, [_run("#1", alignment=0.5), _run("#1", alignment=0.9, repeat=1)])
+    assert twice.per_case_stdev is not None
+    assert twice.per_case_stdev.n == 1
+
+
+def test_score_says_when_two_models_were_mixed():
+    board = _board_with_sections("Summary")
+    other = replace(_run(), model="other-1")
+    report = score([board], [_run(), other])
+    assert report.model == "fixed-1, other-1"
+
+
+def test_runs_for_an_unknown_board_are_dropped_not_miscounted():
+    board = _board_with_sections("Summary")
+    stray = replace(_run(), board="gone")
+    report = score([board], [_run(), stray])
+    assert report.runs == 1
+
+
+# -------------------------------------------------------------------- baseline
+
+
+def _report(alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0, runs=10):
+    from ticket_ai_mcp.evals.metrics import BoardReport, Report
+
+    return Report(
+        model=model,
+        boards=tuple(
+            BoardReport(
+                board=slug,
+                cases=1,
+                runs=runs,
+                failed=failed,
+                alignment=Spread.of([value, value]),
+                per_case_stdev=None,
+                seconds=None,
+                revised=0.0,
+                invented_rate=0.0,
+                invented_headings=(),
+                wrong_language_rate=0.0,
+            )
+            for slug, value in boards
+        ),
+        runs=runs,
+        failed=failed,
+        alignment=Spread.of([alignment, alignment]),
+    )
+
+
+def test_a_baseline_survives_a_round_trip(tmp_path):
+    path = tmp_path / "baseline.json"
+    Baseline.of(_report()).save(path)
+    back = Baseline.load(path)
+    assert back.alignment == 0.80
+    assert back.boards == {"acme": 0.80}
+
+
+def test_a_small_drop_is_noise_and_passes():
+    verdict = compare(_report(alignment=0.77), Baseline.of(_report(alignment=0.80)))
+    assert verdict.ok
+    assert verdict.complaints == ()
+
+
+def test_a_drop_past_the_tolerance_fails_and_says_by_how_much():
+    verdict = compare(_report(alignment=0.70), Baseline.of(_report(alignment=0.80)))
+    assert not verdict.ok
+    assert "0.100 below the baseline" in verdict.complaints[0]
+
+
+def test_a_board_that_collapsed_fails_even_when_the_total_holds():
+    # The whole point of checking boards as well: three points gained on one
+    # and eight lost on another averages out, and the average is the number
+    # nobody investigates.
+    base = Baseline.of(_report(alignment=0.80, boards=(("acme", 0.80), ("zeta", 0.80))))
+    now = _report(alignment=0.80, boards=(("acme", 0.88), ("zeta", 0.70)))
+    verdict = compare(now, base)
+    assert not verdict.ok
+    assert any("board zeta" in c for c in verdict.complaints)
+
+
+def test_a_vanished_board_is_a_complaint_not_a_silent_improvement():
+    base = Baseline.of(_report(boards=(("acme", 0.80), ("zeta", 0.60))))
+    verdict = compare(_report(alignment=0.80, boards=(("acme", 0.80),)), base)
+    assert not verdict.ok
+    assert any("zeta is in the baseline but produced no runs" in c for c in verdict.complaints)
+
+
+def test_a_different_model_is_a_note_not_a_failure():
+    base = Baseline.of(_report(alignment=0.80))
+    verdict = compare(_report(alignment=0.60, model="other-1"), base)
+    assert any("this run is other-1" in n for n in verdict.notes)
+    # Still judged on the numbers: the note explains, it does not excuse.
+    assert not verdict.ok
+
+
+def test_a_new_board_is_a_note_not_a_complaint():
+    base = Baseline.of(_report(boards=(("acme", 0.80),)))
+    verdict = compare(_report(boards=(("acme", 0.80), ("new", 0.80))), base)
+    assert verdict.ok
+    assert any("board new is new" in n for n in verdict.notes)
+
+
+def test_a_run_where_nothing_succeeded_cannot_pass():
+    from ticket_ai_mcp.evals.metrics import Report
+
+    empty = Report(model="fixed-1", boards=(), runs=3, failed=3, alignment=None)
+    verdict = compare(empty, Baseline.of(_report()))
+    assert not verdict.ok
+    assert verdict.complaints == ("no run succeeded",)
+
+
+def test_a_report_with_no_successful_runs_cannot_become_a_baseline():
+    from ticket_ai_mcp.evals.metrics import Report
+
+    with pytest.raises(ValueError, match="cannot be a baseline"):
+        Baseline.of(Report(model="x", boards=(), runs=1, failed=1, alignment=None))
+
+
+# ---------------------------------------------------------------------- render
+
+
+def test_the_report_prints_the_spread_next_to_the_mean():
+    text = render(_report(alignment=0.80))
+    assert "0.800" in text
+    assert "±" in text
+
+
+def test_one_observation_says_so_instead_of_claiming_zero_spread():
+    from ticket_ai_mcp.evals.metrics import Report
+
+    single = Report(model="m", boards=(), runs=1, failed=0, alignment=Spread.of([0.8]))
+    assert "n=1" in render(single)
+    assert "±0.000" not in render(single)
+
+
+def test_the_total_comes_after_the_boards():
+    text = render(_report(boards=(("acme", 0.8), ("zeta", 0.8))))
+    assert text.index("zeta") < text.index("total")
+
+
+def test_a_failing_verdict_is_printed_with_its_reasons():
+    base = Baseline.of(_report(alignment=0.90))
+    verdict = compare(_report(alignment=0.60), base)
+    text = render(_report(alignment=0.60), verdict)
+    assert "FAIL" in text
+    assert "below the baseline" in text
+
+
+def test_a_run_with_nothing_in_it_says_so():
+    from ticket_ai_mcp.evals.metrics import Report
+
+    assert "no runs" in render(Report(model="m", boards=(), runs=0, failed=0, alignment=None))
+
+
+def test_markdown_is_a_table_with_a_bold_total():
+    md = render_markdown(_report())
+    assert md.splitlines()[2].startswith("| board |")
+    assert "| **total** |" in md
+
+
+def test_markdown_carries_the_verdict():
+    base = Baseline.of(_report(alignment=0.90))
+    md = render_markdown(_report(alignment=0.60), compare(_report(alignment=0.60), base))
+    assert "**FAIL**" in md
