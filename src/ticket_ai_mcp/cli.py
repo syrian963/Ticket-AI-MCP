@@ -14,6 +14,9 @@ The verbs, roughly in the order a ticket passes through them:
 - `open` reviews every open ticket, worst first.
 - `models` lists what the configured endpoint can reach.
 - `ui` serves a local page for the parts that want a text box.
+- `eval` runs the frozen dataset in `evals/` and marks the result against a
+  committed baseline. The only verb that is about the tool rather than about
+  a ticket.
 
 `learn` is separate from the rest on purpose. Mining is minutes of API calls
 and the answer barely moves week to week, so it is a thing you do once and
@@ -33,6 +36,7 @@ from .compose import compose
 from .config import cache_dir, settings, tracker_for, writer_for
 from .context import gather
 from .corpus import Gathered, by_mining, from_keys
+from .evals.baseline import TOLERANCE as TOLERANCE_DEFAULT
 from .i18n import SUPPORTED, ticket_language
 from .profile import Profile, build
 from .report import (
@@ -226,6 +230,56 @@ def cmd_compose(args: argparse.Namespace) -> int:
     if result.review.alignment is not None and result.review.alignment < args.fail_under:
         return 1
     return 0
+
+
+def cmd_eval(args: argparse.Namespace) -> int:
+    """Run the frozen dataset and mark the result. Needs a model.
+
+    Three steps that are deliberately separable, because the expensive one is
+    the first: `--runs` scores an existing results file without composing
+    anything, which is how a changed metric gets tried for free.
+    """
+    from .evals.baseline import Baseline, compare
+    from .evals.dataset import load_suite
+    from .evals.metrics import score
+    from .evals.render import render, render_markdown
+    from .evals.runner import Progress, read_runs, run_suite, write_runs
+
+    boards = load_suite(Path(args.dataset) if args.dataset else None)
+
+    if args.runs:
+        runs = read_runs(Path(args.runs))
+    else:
+        writer = writer_for(args.writer, args.model)
+        if writer is None:
+            print(
+                "No model configured, so there is nothing to evaluate. "
+                "See `ticket-ai compose` for how to point at one.",
+                file=sys.stderr,
+            )
+            return 2
+
+        def progress(p: Progress) -> None:
+            if p.run is None:
+                print(f"  {p.done + 1}/{p.total} {p.board} {p.case}", file=sys.stderr)
+
+        out = Path(args.out or "evals/results/latest.jsonl")
+        written = write_runs(out, run_suite(boards, writer, repeats=args.repeats, on_progress=progress))
+        print(f"  wrote {written} records to {out}", file=sys.stderr)
+        runs = read_runs(out)
+
+    report = score(boards, runs)
+
+    verdict = None
+    baseline_path = Path(args.baseline) if args.baseline else None
+    if baseline_path and args.update_baseline:
+        Baseline.of(report).save(baseline_path)
+        print(f"  baseline written to {baseline_path}", file=sys.stderr)
+    elif baseline_path:
+        verdict = compare(report, Baseline.load(baseline_path), tolerance=args.tolerance)
+
+    print(render_markdown(report, verdict) if args.markdown else render(report, verdict))
+    return 0 if (verdict is None or verdict.ok) else 1
 
 
 def cmd_models(args: argparse.Namespace) -> int:
@@ -445,6 +499,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="exit non-zero if any ticket scores below this (0-1). For CI.",
     )
     rev.set_defaults(func=cmd_review)
+
+    ev = sub.add_parser("eval", help="run the frozen dataset and mark the result")
+    ev.add_argument("--dataset", help="a dataset directory other than evals/dataset")
+    ev.add_argument("--runs", help="score an existing results file instead of composing")
+    ev.add_argument("--out", help="where to append the records (default evals/results/latest.jsonl)")
+    ev.add_argument("--repeats", type=int, default=1, help="times to run every case")
+    ev.add_argument("--baseline", help="a baseline file to mark against")
+    ev.add_argument("--update-baseline", action="store_true", help="write the baseline instead")
+    ev.add_argument("--tolerance", type=float, default=TOLERANCE_DEFAULT)
+    ev.add_argument("--markdown", action="store_true", help="a table for a pull request")
+    ev.add_argument("--writer")
+    ev.add_argument("--model")
+    ev.set_defaults(func=cmd_eval)
 
     op = sub.add_parser("open", help="review every open ticket, worst first")
     op.add_argument("--limit", type=int, default=100)

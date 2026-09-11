@@ -1,0 +1,189 @@
+{
+  "project": "veloren/veloren",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T14:03:59.343565+00:00",
+  "sample_size": 35,
+  "exemplar_keys": [
+    "#1583",
+    "#2035",
+    "#1950",
+    "#2075",
+    "#1621",
+    "#1924",
+    "#2011",
+    "#2022",
+    "#2024",
+    "#2045",
+    "#2107",
+    "#2116",
+    "#2132",
+    "#2160",
+    "#1438",
+    "#2053",
+    "#2067",
+    "#2070",
+    "#2149",
+    "#2162",
+    "#908",
+    "#1168",
+    "#1694",
+    "#1936",
+    "#2059",
+    "#2076",
+    "#2085",
+    "#1463",
+    "#2013",
+    "#2146",
+    "#2165",
+    "#2033",
+    "#2112",
+    "#2139",
+    "#2176"
+  ],
+  "sections": [
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 7,
+      "rate": 0.2,
+      "position": 0.0
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 7,
+      "rate": 0.2,
+      "position": 1.0
+    },
+    {
+      "heading": "Relevant logs and/or screenshots",
+      "key": "relevant logs and or screenshots",
+      "count": 7,
+      "rate": 0.2,
+      "position": 2.0
+    },
+    {
+      "heading": "System details",
+      "key": "system details",
+      "count": 7,
+      "rate": 0.2,
+      "position": 3.29
+    },
+    {
+      "heading": "Veloren version",
+      "key": "veloren version",
+      "count": 7,
+      "rate": 0.2,
+      "position": 4.43
+    }
+  ],
+  "conditionals": [],
+  "discriminative": {},
+  "chars_median": 482.0,
+  "chars_p25": 286.0,
+  "chars_p75": 839.0,
+  "title_words_median": 7.0,
+  "title_prefixes": [
+    [
+      "Animal/",
+      0.029
+    ],
+    [
+      "[Nightly]",
+      0.029
+    ],
+    [
+      "Localize /",
+      0.029
+    ],
+    [
+      "Feature:",
+      0.029
+    ],
+    [
+      "Bug:",
+      0.029
+    ]
+  ],
+  "label_rate": 0.514,
+  "labels_per_ticket_median": 1.0,
+  "common_labels": [
+    [
+      "wg::translation",
+      0.171
+    ],
+    [
+      "beginner",
+      0.143
+    ],
+    [
+      "difficulty::easy",
+      0.143
+    ],
+    [
+      "wg::meta",
+      0.114
+    ],
+    [
+      "type::bug",
+      0.086
+    ],
+    [
+      "category::voxygen",
+      0.086
+    ],
+    [
+      "type::feature",
+      0.086
+    ],
+    [
+      "priority::low",
+      0.057
+    ],
+    [
+      "status::needs investigation",
+      0.057
+    ],
+    [
+      "difficulty::hard",
+      0.057
+    ],
+    [
+      "priority::important",
+      0.057
+    ],
+    [
+      "status::needs discussion",
+      0.057
+    ]
+  ],
+  "label_groups": [
+    "category",
+    "difficulty",
+    "priority",
+    "status",
+    "type",
+    "wg"
+  ],
+  "list_rate": 0.343,
+  "checkbox_rate": 0.143,
+  "code_rate": 0.171,
+  "image_rate": 0.286,
+  "link_rate": 0.457,
+  "cross_ref_rate": 0.4,
+  "assignee_rate": 0.257,
+  "language": "en",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.com",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}

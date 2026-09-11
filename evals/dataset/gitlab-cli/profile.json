@@ -1,0 +1,485 @@
+{
+  "project": "gitlab-org/cli",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T14:07:45.903396+00:00",
+  "sample_size": 29,
+  "exemplar_keys": [
+    "#1040",
+    "#1086",
+    "#1270",
+    "#1307",
+    "#3155",
+    "#652",
+    "#7783",
+    "#7952",
+    "#8101",
+    "#8140",
+    "#8214",
+    "#8220",
+    "#8228",
+    "#8261",
+    "#8262",
+    "#8300",
+    "#8301",
+    "#8305",
+    "#8332",
+    "#8379",
+    "#8399",
+    "#8409",
+    "#8415",
+    "#8421",
+    "#8424",
+    "#8425",
+    "#8435",
+    "#8436",
+    "#8437"
+  ],
+  "sections": [
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 15,
+      "rate": 0.517,
+      "position": 0.4
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 14,
+      "rate": 0.483,
+      "position": 2.79
+    },
+    {
+      "heading": "What is the current bug behavior?",
+      "key": "what is the current bug behavior",
+      "count": 12,
+      "rate": 0.414,
+      "position": 4.0
+    },
+    {
+      "heading": "What is the expected correct behavior?",
+      "key": "what is the expected correct behavior",
+      "count": 12,
+      "rate": 0.414,
+      "position": 5.58
+    },
+    {
+      "heading": "Environment",
+      "key": "environment",
+      "count": 12,
+      "rate": 0.414,
+      "position": 1.67
+    },
+    {
+      "heading": "Possible fixes",
+      "key": "possible fixes",
+      "count": 10,
+      "rate": 0.345,
+      "position": 7.5
+    },
+    {
+      "heading": "Proposal",
+      "key": "proposal",
+      "count": 9,
+      "rate": 0.31,
+      "position": 1.0
+    },
+    {
+      "heading": "Problem to solve",
+      "key": "problem to solve",
+      "count": 7,
+      "rate": 0.241,
+      "position": 0.0
+    },
+    {
+      "heading": "Further details",
+      "key": "further details",
+      "count": 6,
+      "rate": 0.207,
+      "position": 2.0
+    },
+    {
+      "heading": "Links / references",
+      "key": "links references",
+      "count": 6,
+      "rate": 0.207,
+      "position": 3.17
+    },
+    {
+      "heading": "Checklist",
+      "key": "checklist",
+      "count": 6,
+      "rate": 0.207,
+      "position": 0.0
+    },
+    {
+      "heading": "Relevant logs and/or screenshots",
+      "key": "relevant logs and or screenshots",
+      "count": 4,
+      "rate": 0.138,
+      "position": 7.5
+    },
+    {
+      "heading": "Problem",
+      "key": "problem",
+      "count": 4,
+      "rate": 0.138,
+      "position": 0.0
+    },
+    {
+      "heading": "Other",
+      "key": "other",
+      "count": 3,
+      "rate": 0.103,
+      "position": 3.0
+    }
+  ],
+  "conditionals": [
+    {
+      "when": "what is the current bug behavior",
+      "when_heading": "What is the current bug behavior?",
+      "then": "what is the expected correct behavior",
+      "then_heading": "What is the expected correct behavior?",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.414
+    },
+    {
+      "when": "what is the expected correct behavior",
+      "when_heading": "What is the expected correct behavior?",
+      "then": "what is the current bug behavior",
+      "then_heading": "What is the current bug behavior?",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.414
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "environment",
+      "then_heading": "Environment",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.414
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "what is the current bug behavior",
+      "then_heading": "What is the current bug behavior?",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.414
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "what is the expected correct behavior",
+      "then_heading": "What is the expected correct behavior?",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.414
+    },
+    {
+      "when": "environment",
+      "when_heading": "Environment",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.483
+    },
+    {
+      "when": "what is the current bug behavior",
+      "when_heading": "What is the current bug behavior?",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.483
+    },
+    {
+      "when": "what is the expected correct behavior",
+      "when_heading": "What is the expected correct behavior?",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.483
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.483
+    },
+    {
+      "when": "environment",
+      "when_heading": "Environment",
+      "then": "what is the current bug behavior",
+      "then_heading": "What is the current bug behavior?",
+      "count": 11,
+      "of": 12,
+      "rate": 0.917,
+      "baseline": 0.414
+    },
+    {
+      "when": "environment",
+      "when_heading": "Environment",
+      "then": "what is the expected correct behavior",
+      "then_heading": "What is the expected correct behavior?",
+      "count": 11,
+      "of": 12,
+      "rate": 0.917,
+      "baseline": 0.414
+    },
+    {
+      "when": "what is the current bug behavior",
+      "when_heading": "What is the current bug behavior?",
+      "then": "environment",
+      "then_heading": "Environment",
+      "count": 11,
+      "of": 12,
+      "rate": 0.917,
+      "baseline": 0.414
+    },
+    {
+      "when": "what is the expected correct behavior",
+      "when_heading": "What is the expected correct behavior?",
+      "then": "environment",
+      "then_heading": "Environment",
+      "count": 11,
+      "of": 12,
+      "rate": 0.917,
+      "baseline": 0.414
+    },
+    {
+      "when": "environment",
+      "when_heading": "Environment",
+      "then": "possible fixes",
+      "then_heading": "Possible fixes",
+      "count": 10,
+      "of": 12,
+      "rate": 0.833,
+      "baseline": 0.345
+    },
+    {
+      "when": "what is the current bug behavior",
+      "when_heading": "What is the current bug behavior?",
+      "then": "possible fixes",
+      "then_heading": "Possible fixes",
+      "count": 10,
+      "of": 12,
+      "rate": 0.833,
+      "baseline": 0.345
+    },
+    {
+      "when": "what is the expected correct behavior",
+      "when_heading": "What is the expected correct behavior?",
+      "then": "possible fixes",
+      "then_heading": "Possible fixes",
+      "count": 10,
+      "of": 12,
+      "rate": 0.833,
+      "baseline": 0.345
+    },
+    {
+      "when": "environment",
+      "when_heading": "Environment",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.517
+    },
+    {
+      "when": "what is the current bug behavior",
+      "when_heading": "What is the current bug behavior?",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.517
+    },
+    {
+      "when": "what is the expected correct behavior",
+      "when_heading": "What is the expected correct behavior?",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 12,
+      "of": 12,
+      "rate": 1.0,
+      "baseline": 0.517
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.517
+    },
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "environment",
+      "then_heading": "Environment",
+      "count": 12,
+      "of": 14,
+      "rate": 0.857,
+      "baseline": 0.414
+    },
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "what is the current bug behavior",
+      "then_heading": "What is the current bug behavior?",
+      "count": 12,
+      "of": 14,
+      "rate": 0.857,
+      "baseline": 0.414
+    },
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "what is the expected correct behavior",
+      "then_heading": "What is the expected correct behavior?",
+      "count": 12,
+      "of": 14,
+      "rate": 0.857,
+      "baseline": 0.414
+    },
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 13,
+      "of": 14,
+      "rate": 0.929,
+      "baseline": 0.517
+    }
+  ],
+  "discriminative": {},
+  "chars_median": 995.0,
+  "chars_p25": 763.0,
+  "chars_p75": 1224.0,
+  "title_words_median": 9.0,
+  "title_prefixes": [
+    [
+      "[Feature Request]",
+      0.034
+    ],
+    [
+      "Yes/",
+      0.034
+    ],
+    [
+      "[stack save]",
+      0.034
+    ]
+  ],
+  "label_rate": 1.0,
+  "labels_per_ticket_median": 8.0,
+  "common_labels": [
+    [
+      "automation:ml",
+      0.759
+    ],
+    [
+      "category:gitlab cli",
+      0.655
+    ],
+    [
+      "group::code review",
+      0.655
+    ],
+    [
+      "type::bug",
+      0.621
+    ],
+    [
+      "section::ai",
+      0.586
+    ],
+    [
+      "devops::ai coding",
+      0.586
+    ],
+    [
+      "bug::functional",
+      0.552
+    ],
+    [
+      "backend",
+      0.517
+    ],
+    [
+      "category:code review workflow",
+      0.345
+    ],
+    [
+      "type::feature",
+      0.276
+    ],
+    [
+      "documentation",
+      0.276
+    ],
+    [
+      "tw::triaged",
+      0.241
+    ]
+  ],
+  "label_groups": [
+    "backlog",
+    "bug",
+    "cli command",
+    "devops",
+    "feature",
+    "group",
+    "maintenance",
+    "section",
+    "severity",
+    "tw",
+    "type",
+    "workflow"
+  ],
+  "list_rate": 0.793,
+  "checkbox_rate": 0.207,
+  "code_rate": 0.552,
+  "image_rate": 0.103,
+  "link_rate": 0.31,
+  "cross_ref_rate": 0.172,
+  "assignee_rate": 0.207,
+  "language": "en",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.com",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}
