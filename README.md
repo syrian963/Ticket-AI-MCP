@@ -370,6 +370,22 @@ documenting the caveat once and letting the number travel without it.
 [**evals/README.md**](evals/README.md) has the rules about what may become a
 case. Public boards only.
 
+### Where it runs
+
+The cheap half runs on every pull request that touches the harness: every board
+loads, no case is also an exemplar, and a committed results file is re-scored.
+No model, so it costs seconds.
+
+The suite itself is `workflow_dispatch`. Composing 55 cases is minutes and
+money, and paying for it on a branch about a README typo buys nothing.
+
+`terraform/` is the report's address: an S3 bucket behind CloudFront, and an
+IAM role GitHub Actions assumes with a short-lived OIDC token. **There is no
+AWS key in the repository secrets** to leak or rotate. The trust policy is
+scoped to one repository; `repo:owner/*` would hand the role to every
+repository that owner ever creates. Everything works without any of it, and the
+publish step skips itself when the role variable is unset.
+
 ## Documentation
 
 | | |

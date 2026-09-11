@@ -19,3 +19,9 @@ fleet.json
 # they are produced per machine and per model, and a diff of two of them is not
 # something anyone reads in a pull request.
 evals/results/
+
+# Terraform state names the account and holds whatever the provider read back.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars

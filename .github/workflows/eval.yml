@@ -1,0 +1,128 @@
+# The evaluation, split the way the cost is split.
+#
+# `dataset` runs on every pull request that touches the harness. It loads every
+# board and scores a committed results file, both without a model, so it costs
+# seconds and catches the things that actually break: a case file edited by
+# hand into invalid JSON, a board directory dropped, a metric that throws on
+# real data.
+#
+# `suite` needs a model and is asked for by hand. Composing 55 cases is minutes
+# and money, and running it on every push would mean paying for a number nobody
+# reads on a branch that is about a typo in the README.
+name: eval
+
+on:
+  pull_request:
+    paths:
+      - "src/ticket_ai_mcp/evals/**"
+      - "evals/**"
+      - "tools/build_eval_dataset.py"
+      - ".github/workflows/eval.yml"
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "times to run every case"
+        default: "3"
+      model:
+        description: "model name for the configured endpoint"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dataset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+
+      - name: every board loads
+        run: |
+          uv run python -c "
+          from ticket_ai_mcp.evals import load_suite
+          boards = load_suite()
+          total = sum(len(b.cases) for b in boards)
+          for b in boards:
+              print(f'{b.slug}: {len(b.cases)} cases, {b.profile.sample_size} exemplars')
+          print(f'{total} cases over {len(boards)} boards')
+          assert total >= 40, f'the dataset shrank to {total} cases'
+          "
+
+      - name: no case is also an exemplar
+        # The leak the split exists to prevent. Cheap to check and silent when
+        # it happens, which is the combination that makes it worth a step.
+        run: |
+          uv run python -c "
+          from ticket_ai_mcp.evals import load_suite
+          for b in load_suite():
+              overlap = set(b.profile.exemplar_keys) & {c.key for c in b.cases}
+              assert not overlap, f'{b.slug}: {sorted(overlap)} is both corpus and case'
+          print('no overlap on any board')
+          "
+
+      - name: score the committed records, if there are any
+        run: |
+          if [ -f evals/results/committed.jsonl ]; then
+            uv run ticket-ai eval --runs evals/results/committed.jsonl \
+              ${{ hashFiles('evals/baseline.json') != '' && '--baseline evals/baseline.json' || '' }} \
+              --markdown >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "no committed records to score" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  suite:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # For the OIDC token. The role it assumes is the one in terraform/, and
+      # it is scoped to writing under reports/ in one bucket.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+
+      - name: run the suite
+        env:
+          TICKET_AI_WRITER: openai
+          TICKET_AI_BASE_URL: ${{ vars.EVAL_BASE_URL }}
+          TICKET_AI_MODEL: ${{ inputs.model || vars.EVAL_MODEL }}
+          TICKET_AI_API_KEY: ${{ secrets.EVAL_API_KEY }}
+        run: |
+          uv run ticket-ai eval \
+            --repeats "${{ inputs.repeats }}" \
+            --baseline evals/baseline.json \
+            --out evals/results/ci.jsonl \
+            --markdown | tee report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: keep the records whatever the gate said
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-records
+          path: evals/results/ci.jsonl
+
+      - name: publish the report
+        # Only when a role has been set up. The repository works without any of
+        # the AWS side, and a missing variable should skip the step rather than
+        # fail a run that already produced its answer.
+        if: always() && vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
+
+      - name: upload it
+        if: always() && vars.AWS_ROLE_ARN != ''
+        run: |
+          aws s3 cp report.md "s3://${{ vars.EVAL_BUCKET }}/reports/${{ github.run_id }}.md"
