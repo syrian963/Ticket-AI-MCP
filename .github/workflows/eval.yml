@@ -6,9 +6,9 @@
 # hand into invalid JSON, a board directory dropped, a metric that throws on
 # real data.
 #
-# `suite` needs a model and is asked for by hand. Composing 55 cases is minutes
-# and money, and running it on every push would mean paying for a number nobody
-# reads on a branch that is about a typo in the README.
+# `suite` needs a model and is asked for by hand. Composing the whole dataset
+# is minutes and money, and running it on every push would mean paying for a
+# number nobody reads on a branch that is about a typo in the README.
 name: eval
 
 on:

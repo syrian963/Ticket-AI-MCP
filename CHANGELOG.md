@@ -12,7 +12,7 @@ about the prose that comes back. `docs/local-models.md` came closest: seven
 titles, one model, one pass. `ticket-ai eval` is the difference between that
 and an evaluation.
 
-- **A dataset that does not move.** 109 cases over eight public boards, each
+- **A dataset that does not move.** 121 cases over nine public boards, each
   stored next to the board profile as it stood when the case was collected.
   `compose` writes into whatever shape the profile describes, so relearning a
   board between two runs moves the score with nothing about the model having
