@@ -77,15 +77,27 @@ jobs:
           print('no overlap on any board')
           "
 
-      - name: score the committed records, if there are any
+      - name: the stub floor, as a table
+        # The suite already asserts the invariants behind these numbers;
+        # printing them is so a reviewer sees them move rather than only a
+        # green tick. No model, about a tenth of a second.
         run: |
-          if [ -f evals/results/committed.jsonl ]; then
-            uv run ticket-ai eval --runs evals/results/committed.jsonl \
-              ${{ hashFiles('evals/baseline.json') != '' && '--baseline evals/baseline.json' || '' }} \
-              --markdown >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "no committed records to score" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          uv run python - <<'SCRIPT' >> "$GITHUB_STEP_SUMMARY"
+          from ticket_ai_mcp.evals import load_suite, run_suite
+          from ticket_ai_mcp.evals.metrics import score
+          from ticket_ai_mcp.evals.render import render_markdown
+
+          class Stub:
+              name = model = "stub"
+
+              def write(self, system, prompt):
+                  return "The label printing stops after ten positions. " * 20
+
+          boards = load_suite()
+          print("### Stub floor, no model")
+          print()
+          print(render_markdown(score(boards, run_suite(boards, Stub()))))
+          SCRIPT
 
   suite:
     if: github.event_name == 'workflow_dispatch'
