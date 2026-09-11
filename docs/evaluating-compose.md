@@ -11,7 +11,7 @@ evaluation.
 
 ## The dataset had to stop moving
 
-109 cases over eight public boards, each stored next to **the board profile as it
+121 cases over nine public boards, each stored next to **the board profile as it
 stood when the case was collected**.
 
 Freezing the profile is not tidiness. `compose` writes into whatever shape the
@@ -29,6 +29,7 @@ wrong thing while looking exactly like a comparison.
 | fdroid | 10 | GitLab | English | 3 | 4 |
 | hibernate | 10 | **Jira** | English | **prose** | 4 |
 | veloren | 10 | GitLab | English | **prose** | 5 |
+| cassandra | 12 | **Jira** | English | **prose** | 8 |
 
 Two columns, because they are two different things. **Skeleton** is what the
 prompt asks for: the sections common enough to be worth naming. **Sections
@@ -151,26 +152,39 @@ than a result.
 **No labels yet**, so the judge cannot be calibrated and its output is exactly
 the opinion the `uncalibrated` line says it is.
 
-**One assertion cannot fire on its own, and it took a count to say why
-correctly.** The first guess was that shape and tracker line up exactly. They do
-not:
+**One assertion cannot fire on its own, and chasing it turned up something
+better.** The guard wants a board without a skeleton and a board with one. It
+cannot fire independently because all three Jira boards write prose, so removing
+every prose board removes every Jira board and the tracker assertion goes first.
 
-| | prose | skeleton |
+The reason is not that Jira users write worse tickets. Every Jira board here has
+a section vocabulary. **None of it is a convention**, and the numbers are not
+close:
+
+| Board | Tracker | Highest section rate |
 |---|---|---|
-| **GitLab** | veloren | fdroid, fitko-fim, gitlab-cli, inkscape, kern-ux |
-| **Jira** | hibernate, kafka | — |
+| inkscape | GitLab | 96%, 96%, 92%, 81%, 77% |
+| veloren | GitLab | 20%, 20%, 20%, 20%, 20% |
+| kafka | Jira | 13%, 10%, 6%, 6%, 6% |
+| hibernate | Jira | 9%, 6%, 6%, 6% |
+| cassandra | Jira | 6%, 6%, 6%, 6%, 6% |
 
-There is a GitLab board writing prose. What is true is the weaker statement, and
-it is enough to explain the guard: **both Jira boards are prose**, so the prose
-set contains the Jira set, and removing every prose board removes every Jira
-board. The tracker assertion fires first and the prose assertion never gets a
-turn.
+CASSANDRA has `Environment`, `Reproduction`, `Result`, `Tests`, `Summary`, `Root
+cause` and `Steps to reproduce` in its vocabulary. Not one of them reaches seven
+percent.
 
-The Jira half is probably not sampling luck. GitLab issue templates are files
-committed in the repository, so a board that wants a shape gets one by default;
-a Jira description is a free text field, and both Jira boards here read like
-mailing-list posts. One prose GitLab board against five with templates points
-the same way.
+**The skeleton threshold is 0.6, and across nine boards nothing lands near it.**
+Every board is either far above or far below, which says the default is not a
+knob anyone has to tune and that the two shapes are genuinely two shapes rather
+than two ends of a slider. GitLab issue templates are committed files that
+pre-fill the box; a Jira description starts empty, and a team that agrees on a
+shape in a wiki page gets six percent adoption.
+
+This is also the case for measuring invented headings against every observed
+section rather than the skeleton. On CASSANDRA a draft that writes `Root cause`
+is using the board's own vocabulary, and the prompt never mentioned it because
+nothing there is common enough to name.
 
 The guard stays: it costs nothing and becomes meaningful the day a Jira board
-with a template joins. But this page should not claim it is being exercised.
+with an enforced template joins. But this page should not claim it is being
+exercised.

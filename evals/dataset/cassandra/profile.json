@@ -1,0 +1,141 @@
+{
+  "project": "CASSANDRA",
+  "tracker": "jira",
+  "built_at": "2026-09-11T16:18:05.858194+00:00",
+  "sample_size": 33,
+  "exemplar_keys": [
+    "CASSANDRA-19918",
+    "CASSANDRA-21505",
+    "CASSANDRA-21644",
+    "CASSANDRA-21661",
+    "CASSANDRA-21666",
+    "CASSANDRA-21528",
+    "CASSANDRA-21536",
+    "CASSANDRA-21549",
+    "CASSANDRA-21640",
+    "CASSANDRA-20091",
+    "CASSANDRA-21320",
+    "CASSANDRA-21321",
+    "CASSANDRA-21425",
+    "CASSANDRA-21455",
+    "CASSANDRA-21526",
+    "CASSANDRA-21480",
+    "CASSANDRA-21487",
+    "CASSANDRA-21508",
+    "CASSANDRA-21534",
+    "CASSANDRA-21548",
+    "CASSANDRA-18464",
+    "CASSANDRA-20949",
+    "CASSANDRA-21098",
+    "CASSANDRA-21218",
+    "CASSANDRA-21224",
+    "CASSANDRA-21251",
+    "CASSANDRA-21255",
+    "CASSANDRA-21301",
+    "CASSANDRA-21410",
+    "CASSANDRA-21441",
+    "CASSANDRA-21444",
+    "CASSANDRA-16290",
+    "CASSANDRA-21515"
+  ],
+  "sections": [
+    {
+      "heading": "Environment",
+      "key": "environment",
+      "count": 2,
+      "rate": 0.061,
+      "position": 4.0
+    },
+    {
+      "heading": "Reproduction",
+      "key": "reproduction",
+      "count": 2,
+      "rate": 0.061,
+      "position": 3.0
+    },
+    {
+      "heading": "Result",
+      "key": "result",
+      "count": 2,
+      "rate": 0.061,
+      "position": 2.0
+    },
+    {
+      "heading": "Tests",
+      "key": "tests",
+      "count": 2,
+      "rate": 0.061,
+      "position": 4.5
+    },
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 2,
+      "rate": 0.061,
+      "position": 0.0
+    },
+    {
+      "heading": "Root cause",
+      "key": "root cause",
+      "count": 2,
+      "rate": 0.061,
+      "position": 1.0
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 2,
+      "rate": 0.061,
+      "position": 4.5
+    },
+    {
+      "heading": "description",
+      "key": "description",
+      "count": 2,
+      "rate": 0.061,
+      "position": 0.0
+    }
+  ],
+  "conditionals": [],
+  "discriminative": {},
+  "chars_median": 1239.0,
+  "chars_p25": 643.0,
+  "chars_p75": 2670.0,
+  "title_words_median": 10.0,
+  "title_prefixes": [
+    [
+      "CI:",
+      0.03
+    ],
+    [
+      "CEP-",
+      0.03
+    ],
+    [
+      "TLS/",
+      0.03
+    ]
+  ],
+  "label_rate": 0.061,
+  "labels_per_ticket_median": 0.0,
+  "common_labels": [
+    [
+      "lhf",
+      0.03
+    ],
+    [
+      "SAI",
+      0.03
+    ]
+  ],
+  "label_groups": [],
+  "list_rate": 0.545,
+  "checkbox_rate": 0.0,
+  "code_rate": 0.333,
+  "image_rate": 0.0,
+  "link_rate": 0.273,
+  "cross_ref_rate": 0.121,
+  "assignee_rate": 0.97,
+  "language": "en",
+  "note_codes": []
+}
