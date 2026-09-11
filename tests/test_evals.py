@@ -421,7 +421,9 @@ def test_runs_for_an_unknown_board_are_dropped_not_miscounted():
 # -------------------------------------------------------------------- baseline
 
 
-def _report(alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0, runs=10):
+def _report(
+    alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0, runs=10, checks=5
+):
     from ticket_ai_mcp.evals.metrics import BoardReport, Report
 
     return Report(
@@ -433,6 +435,7 @@ def _report(alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0,
                 runs=runs,
                 failed=failed,
                 alignment=Spread.of([value, value]),
+                checks=Spread.of([float(checks), float(checks)]),
                 per_case_stdev=None,
                 seconds=None,
                 revised=0.0,
@@ -445,6 +448,8 @@ def _report(alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0,
         runs=runs,
         failed=failed,
         alignment=Spread.of([alignment, alignment]),
+        pooled=alignment,
+        checks=checks * runs,
     )
 
 
@@ -529,7 +534,7 @@ def test_the_report_prints_the_spread_next_to_the_mean():
 def test_one_observation_says_so_instead_of_claiming_zero_spread():
     from ticket_ai_mcp.evals.metrics import Report
 
-    single = Report(model="m", boards=(), runs=1, failed=0, alignment=Spread.of([0.8]))
+    single = Report(model="m", boards=(), runs=1, failed=0, alignment=Spread.of([0.8]), pooled=0.8, checks=5)
     assert "n=1" in render(single)
     assert "±0.000" not in render(single)
 
@@ -556,7 +561,7 @@ def test_a_run_with_nothing_in_it_says_so():
 def test_markdown_is_a_table_with_a_bold_total():
     md = render_markdown(_report())
     assert md.splitlines()[2].startswith("| board |")
-    assert "| **total** |" in md
+    assert "| **total (pooled)** |" in md
 
 
 def test_markdown_carries_the_verdict():
@@ -825,6 +830,8 @@ def test_the_html_page_escapes_what_came_from_a_board():
         runs=1,
         failed=0,
         alignment=Spread.of([0.5]),
+        pooled=0.5,
+        checks=5,
     )
     html = render_html(nasty)
     assert "<script>" not in html
@@ -859,3 +866,63 @@ def test_a_missing_default_dataset_explains_that_it_is_not_in_the_wheel(monkeypa
 def test_an_explicit_missing_directory_stays_a_short_message(tmp_path):
     with pytest.raises(DatasetError, match=r"does not exist$"):
         load_suite(tmp_path / "nope")
+
+
+# ------------------------------- pooling, because boards do not check equally
+
+
+def test_the_total_pools_by_checks_instead_of_averaging_over_runs():
+    # A board that runs two checks a draft should not weigh as much as one that
+    # runs nine. A stub writing English prose scores 1.000 on the prose boards
+    # for free, and a plain mean lets that carry the suite.
+    strict = replace(_board_with_sections("Summary"), slug="strict")
+    loose = replace(_board_with_sections("Summary"), slug="loose")
+    runs = [
+        CaseRun("strict", "#1", "m", 0, 1.0, attempts=1, alignment=0.40, checks_run=10),
+        CaseRun("loose", "#1", "m", 0, 1.0, attempts=1, alignment=1.00, checks_run=2),
+    ]
+    report = score([strict, loose], runs)
+
+    assert report.alignment is not None
+    assert report.alignment.mean == 0.70  # the plain mean over two runs
+    # (0.40*10 + 1.00*2) / 12
+    assert report.pooled == 0.5
+    assert report.checks == 12
+
+
+def test_the_gate_judges_the_pooled_figure():
+    base = Baseline.of(_report(alignment=0.80))
+    assert base.alignment == 0.80
+
+    from ticket_ai_mcp.evals.metrics import Report
+
+    # Unweighted mean unchanged, pooled well below: the gate has to see it.
+    slipped = Report(
+        model="fixed-1",
+        boards=_report().boards,
+        runs=10,
+        failed=0,
+        alignment=Spread.of([0.80, 0.80]),
+        pooled=0.60,
+        checks=50,
+    )
+    verdict = compare(slipped, base)
+    assert not verdict.ok
+    assert "pooled alignment 0.600" in verdict.complaints[0]
+
+
+def test_the_report_prints_checks_next_to_alignment():
+    # 1.000 over two checks and 1.000 over nine are not the same claim.
+    text = render(_report(checks=2))
+    assert "checks" in text
+    assert "per draft" in text
+
+
+def test_a_report_with_no_checks_at_all_has_no_pooled_figure():
+    board = _board_with_sections("Summary")
+    runs = [CaseRun("acme", "#1", "m", 0, 1.0, attempts=1, alignment=1.0, checks_run=0)]
+    report = score([board], runs)
+    # Not 0.0 and not 1.0: nothing was checked, which is not the same as
+    # everything passing.
+    assert report.pooled is None
+    assert report.checks == 0

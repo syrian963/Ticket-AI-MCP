@@ -16,6 +16,10 @@ that a later reader can see whether the tolerance was reasonable.
 The board figures are checked as well as the total. A suite that gains three
 points on one board and loses eight on another can come out level overall,
 and the level number is the one nobody investigates.
+
+**The total compared here is the pooled figure, not the mean over runs.**
+Boards differ fourfold in how many checks apply to a draft, so a plain mean
+lets the boards that check least carry the most weight. See `metrics`.
 """
 
 from __future__ import annotations
@@ -45,12 +49,12 @@ class Baseline:
 
     @classmethod
     def of(cls, report: Report) -> Baseline:
-        if report.alignment is None:
+        if report.alignment is None or report.pooled is None:
             raise ValueError("a report with no successful runs cannot be a baseline")
         return cls(
             model=report.model,
             runs=report.runs,
-            alignment=report.alignment.mean,
+            alignment=report.pooled,
             stdev=report.alignment.stdev,
             boards={b.board: b.alignment.mean for b in report.boards if b.alignment},
         )
@@ -111,13 +115,13 @@ def compare(report: Report, baseline: Baseline, *, tolerance: float = TOLERANCE)
     if report.model != baseline.model:
         notes.append(f"baseline is {baseline.model}, this run is {report.model}")
 
-    if report.alignment is None:
+    if report.alignment is None or report.pooled is None:
         return Verdict(False, ("no run succeeded",), tuple(notes))
 
-    drop = baseline.alignment - report.alignment.mean
+    drop = baseline.alignment - report.pooled
     if drop > tolerance:
         complaints.append(
-            f"alignment {report.alignment.mean:.3f} is {drop:.3f} below the "
+            f"pooled alignment {report.pooled:.3f} is {drop:.3f} below the "
             f"baseline {baseline.alignment:.3f} (tolerance {tolerance:.3f})"
         )
 

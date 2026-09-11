@@ -40,6 +40,13 @@ def _board_lines(board: BoardReport) -> list[str]:
         + (f", {board.failed} failed" if board.failed else ""),
         f"    alignment    {_spread(board.alignment)}",
     ]
+    if board.checks is not None:
+        # Printed next to alignment on purpose. 1.000 over two checks and
+        # 1.000 over nine are not the same claim, and only this line says so.
+        lines.append(
+            f"    checks       {board.checks.median:.0f} per draft "
+            f"[{board.checks.low:.0f}-{board.checks.high:.0f}]"
+        )
     if board.per_case_stdev is not None:
         lines.append(
             f"    same case    ±{board.per_case_stdev.mean:.3f} on average "
@@ -78,7 +85,9 @@ def render(report: Report, verdict: Verdict | None = None) -> str:
         lines.append("")
 
     lines.append(f"  total        {report.runs} runs, {_pct(report.failure_rate)} failed")
-    lines.append(f"    alignment  {_spread(report.alignment)}")
+    if report.pooled is not None:
+        lines.append(f"    pooled     {report.pooled:.3f} over {report.checks} checks")
+    lines.append(f"    unweighted {_spread(report.alignment)}")
     if report.findings:
         top = ", ".join(f"{code} ({count})" for code, count in report.findings[:6])
         lines.append(f"    findings   {top}")
@@ -105,8 +114,10 @@ def render_markdown(report: Report, verdict: Verdict | None = None) -> str:
             f"| {board.board} | {board.runs} | {alignment} | {spread} | "
             f"{_pct(board.revised)} | {_pct(board.invented_rate)} | {board.failed} |"
         )
-    total = f"{report.alignment.mean:.3f}" if report.alignment else "-"
-    rows.append(f"| **total** | **{report.runs}** | **{total}** | | | | **{report.failed}** |")
+    total = f"{report.pooled:.3f}" if report.pooled is not None else "-"
+    rows.append(
+        f"| **total (pooled)** | **{report.runs}** | **{total}** | | | | **{report.failed}** |"
+    )
 
     out = [f"**model:** `{report.model}`", "", *rows]
     if verdict is not None:
