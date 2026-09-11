@@ -3,6 +3,16 @@
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org),
 and the release workflow refuses a tag with no section here.
 
+## [0.1.1] - 2026-09-11
+
+The package can be found without being named. The MCP registry proves that
+whoever publishes a manifest owns the package it points at, by looking for the
+server's name in the package's own description - so the line is in the README
+now, and a release writes the manifest to the registry as well as the wheel to
+PyPI.
+
+Nothing about the tool itself changed.
+
 ## [0.1.0] - 2026-09-10
 
 First cut. Learns what a team's tickets look like by measuring the ones that

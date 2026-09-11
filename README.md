@@ -1,6 +1,6 @@
 # ticket-ai
 
-![release](https://img.shields.io/badge/release-v0.1.0-1f6feb?style=for-the-badge&labelColor=22272e)
+![release](https://img.shields.io/badge/release-v0.1.1-1f6feb?style=for-the-badge&labelColor=22272e)
 ![MCP tools](https://img.shields.io/badge/MCP%20tools-8-8957e5?style=for-the-badge&labelColor=22272e)
 ![CLI commands](https://img.shields.io/badge/CLI%20commands-10-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
@@ -74,6 +74,8 @@ export TICKET_AI_GITHUB_TOKEN=...
 ```
 
 </details>
+
+mcp-name: io.github.syrian963/ticket-ai-mcp
 
 ## One command
 

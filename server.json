@@ -3,7 +3,7 @@
   "name": "io.github.syrian963/ticket-ai-mcp",
   "title": "Ticket AI",
   "description": "Measures tickets against the ones your team already shipped: sections, length, labels, duplicates.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "url": "https://github.com/syrian963/Ticket-AI-MCP",
     "source": "github"
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "ticket-ai-mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
