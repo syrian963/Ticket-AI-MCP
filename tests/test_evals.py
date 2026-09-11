@@ -1001,3 +1001,85 @@ def test_the_report_shows_coverage_against_the_board_own_tickets():
     assert report.boards[0].human_coverage is not None
     assert report.boards[0].human_coverage.mean == 1.0
     assert "of the skeleton" in render(report)
+
+
+def test_the_gate_catches_a_coverage_drop_that_alignment_hides():
+    # The scenario coverage was added for: drafts quietly stop writing the
+    # skeleton. Fewer checks apply, so alignment holds or rises, and the one
+    # figure that moved is the one that cannot be gamed.
+    before = _report(alignment=0.80)
+    base = Baseline.of(before)
+    assert base.coverage == {"acme": 0.5}
+
+    from ticket_ai_mcp.evals.metrics import BoardReport, Report
+
+    slipped_board = replace(before.boards[0], coverage=Spread.of([0.1, 0.1]))
+    assert isinstance(slipped_board, BoardReport)
+    slipped = Report(
+        model="fixed-1",
+        boards=(slipped_board,),
+        runs=10,
+        failed=0,
+        alignment=Spread.of([0.80, 0.80]),
+        pooled=0.80,
+        checks=50,
+    )
+    verdict = compare(slipped, base)
+    assert not verdict.ok
+    assert "covers 0.100 of its skeleton" in verdict.complaints[0]
+
+
+def test_a_board_that_lost_its_skeleton_is_its_own_complaint():
+    base = Baseline.of(_report(alignment=0.80))
+    gone = replace(_report(alignment=0.80).boards[0], coverage=None)
+    from ticket_ai_mcp.evals.metrics import Report
+
+    now = Report(
+        model="fixed-1",
+        boards=(gone,),
+        runs=10,
+        failed=0,
+        alignment=Spread.of([0.80, 0.80]),
+        pooled=0.80,
+        checks=50,
+    )
+    verdict = compare(now, base)
+    assert not verdict.ok
+    assert any("no longer has a skeleton" in c for c in verdict.complaints)
+
+
+def test_a_baseline_round_trips_its_coverage(tmp_path):
+    path = tmp_path / "baseline.json"
+    Baseline.of(_report()).save(path)
+    assert Baseline.load(path).coverage == {"acme": 0.5}
+
+
+def test_a_prose_board_contributes_no_coverage_baseline():
+    # No skeleton, no coverage, nothing to gate. Storing 0.0 would make every
+    # later run look like it had collapsed.
+    board = _board_with_sections()
+    report = score([board], [_run()])
+    assert report.boards[0].coverage is None
+    assert Baseline.of(report).coverage == {}
+
+
+def test_markdown_prints_every_figure_against_the_board_own_tickets():
+    # A bare column of scores invites reading them against 1.0, and nothing in
+    # this dataset reaches 1.0 - not even the people whose board it is.
+    md = render_markdown(_report())
+    assert "alignment / theirs" in md
+    assert "coverage / theirs" in md
+    assert "0.800 / 0.900" in md
+
+
+def test_a_prose_board_shows_a_dash_for_coverage_not_a_zero():
+    board = _board_with_sections()
+    md = render_markdown(score([board], [_run()]))
+    assert "| - |" in md
+
+
+def test_the_html_page_carries_the_same_columns():
+    html = render_html(_report())
+    assert "alignment / theirs" in html
+    assert "coverage / theirs" in html
+    assert "total (pooled)" in html
