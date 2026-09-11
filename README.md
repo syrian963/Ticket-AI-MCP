@@ -5,7 +5,7 @@
 ![CLI commands](https://img.shields.io/badge/CLI%20commands-10-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
 
-![tests](https://img.shields.io/badge/tests-406-238636?style=for-the-badge&labelColor=22272e)
+![tests](https://img.shields.io/badge/tests-424-238636?style=for-the-badge&labelColor=22272e)
 ![coverage](https://img.shields.io/badge/coverage-93%25-238636?style=for-the-badge&labelColor=22272e)
 ![python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-484f58?style=for-the-badge&labelColor=22272e&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-484f58?style=for-the-badge&labelColor=22272e)

@@ -1,0 +1,185 @@
+{
+  "project": "inkscape/inkscape",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T13:49:05.579434+00:00",
+  "sample_size": 26,
+  "exemplar_keys": [
+    "#3297",
+    "#3797",
+    "#3994",
+    "#4477",
+    "#4655",
+    "#4656",
+    "#4702",
+    "#4879",
+    "#5277",
+    "#5419",
+    "#5604",
+    "#5659",
+    "#5820",
+    "#5828",
+    "#5839",
+    "#6095",
+    "#6102",
+    "#6115",
+    "#6210",
+    "#6221",
+    "#6224",
+    "#6278",
+    "#6052",
+    "#6140",
+    "#6236",
+    "#6276"
+  ],
+  "sections": [
+    {
+      "heading": "What happened?",
+      "key": "what happened",
+      "count": 25,
+      "rate": 0.962,
+      "position": 1.92
+    },
+    {
+      "heading": "What should have happened?",
+      "key": "what should have happened",
+      "count": 25,
+      "rate": 0.962,
+      "position": 2.92
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 24,
+      "rate": 0.923,
+      "position": 0.75
+    },
+    {
+      "heading": "Version info",
+      "key": "version info",
+      "count": 21,
+      "rate": 0.808,
+      "position": 4.62
+    },
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 20,
+      "rate": 0.769,
+      "position": 0.0
+    },
+    {
+      "heading": "Sample attachments",
+      "key": "sample attachments",
+      "count": 13,
+      "rate": 0.5,
+      "position": 4.08
+    },
+    {
+      "heading": "Inkscape Version and Operating System",
+      "key": "inkscape version and operating system",
+      "count": 3,
+      "rate": 0.115,
+      "position": 3.0
+    }
+  ],
+  "conditionals": [],
+  "discriminative": {},
+  "chars_median": 793.0,
+  "chars_p25": 672.0,
+  "chars_p75": 1070.0,
+  "title_words_median": 9.0,
+  "title_prefixes": [
+    [
+      "inkscape-",
+      0.038
+    ],
+    [
+      "[Improvement]",
+      0.038
+    ],
+    [
+      "[Cairo PDF Exporter]",
+      0.038
+    ]
+  ],
+  "label_rate": 0.885,
+  "labels_per_ticket_median": 3.0,
+  "common_labels": [
+    [
+      "regression",
+      0.385
+    ],
+    [
+      "Importance::Medium",
+      0.385
+    ],
+    [
+      "Importance::Low",
+      0.269
+    ],
+    [
+      "UI",
+      0.154
+    ],
+    [
+      "Importance::High",
+      0.115
+    ],
+    [
+      "UX",
+      0.115
+    ],
+    [
+      "improvement",
+      0.115
+    ],
+    [
+      "text",
+      0.077
+    ],
+    [
+      "Tool::Text",
+      0.077
+    ],
+    [
+      "open+import",
+      0.077
+    ],
+    [
+      "PDF",
+      0.077
+    ],
+    [
+      "preferences",
+      0.038
+    ]
+  ],
+  "label_groups": [
+    "API",
+    "Dialog",
+    "Importance",
+    "Input",
+    "Tool"
+  ],
+  "list_rate": 1.0,
+  "checkbox_rate": 0.038,
+  "code_rate": 0.654,
+  "image_rate": 0.692,
+  "link_rate": 0.192,
+  "cross_ref_rate": 0.038,
+  "assignee_rate": 0.654,
+  "language": "en",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.com",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}
