@@ -53,7 +53,16 @@ jobs:
           for b in boards:
               print(f'{b.slug}: {len(b.cases)} cases, {b.profile.sample_size} exemplars')
           print(f'{total} cases over {len(boards)} boards')
-          assert total >= 40, f'the dataset shrank to {total} cases'
+          assert total >= 60, f'the dataset shrank to {total} cases'
+          # compose branches three ways, and a dataset that lost a branch would
+          # stop measuring it without the average moving at all - the failure
+          # would be invisible in the one number people read.
+          assert [b for b in boards if b.language == 'de'], 'no German board left'
+          assert {b.tracker for b in boards} >= {'gitlab', 'jira'}, 'one tracker only'
+          prose = [b for b in boards if not b.profile.skeleton()]
+          assert prose, 'no board without recurring sections left'
+          print('branches:', sorted({b.tracker for b in boards}),
+                sorted({b.language for b in boards}), 'prose:', [b.slug for b in prose])
           "
 
       - name: no case is also an exemplar
@@ -102,6 +111,7 @@ jobs:
             --repeats "${{ inputs.repeats }}" \
             --baseline evals/baseline.json \
             --out evals/results/ci.jsonl \
+            --html site/index.html \
             --markdown | tee report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -125,4 +135,7 @@ jobs:
       - name: upload it
         if: always() && vars.AWS_ROLE_ARN != ''
         run: |
-          aws s3 cp report.md "s3://${{ vars.EVAL_BUCKET }}/reports/${{ github.run_id }}.md"
+          # index.html, because the distribution's default root object is
+          # index.html and a .md served from S3 downloads instead of rendering.
+          aws s3 cp site/index.html "s3://${{ vars.EVAL_BUCKET }}/reports/${{ github.run_id }}/index.html"
+          aws s3 cp site/index.html "s3://${{ vars.EVAL_BUCKET }}/reports/latest/index.html"

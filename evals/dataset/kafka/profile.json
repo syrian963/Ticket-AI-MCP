@@ -1,0 +1,137 @@
+{
+  "project": "KAFKA",
+  "tracker": "jira",
+  "built_at": "2026-09-11T15:14:54.099884+00:00",
+  "sample_size": 31,
+  "exemplar_keys": [
+    "KAFKA-20103",
+    "KAFKA-20357",
+    "KAFKA-20693",
+    "KAFKA-20700",
+    "KAFKA-20748",
+    "KAFKA-20838",
+    "KAFKA-20917",
+    "KAFKA-20987",
+    "KAFKA-20988",
+    "KAFKA-19629",
+    "KAFKA-20699",
+    "KAFKA-20724",
+    "KAFKA-20819",
+    "KAFKA-20393",
+    "KAFKA-20448",
+    "KAFKA-20563",
+    "KAFKA-20765",
+    "KAFKA-20843",
+    "KAFKA-20850",
+    "KAFKA-20873",
+    "KAFKA-20915",
+    "KAFKA-20974",
+    "KAFKA-20994",
+    "KAFKA-18171",
+    "KAFKA-12406",
+    "KAFKA-19003",
+    "KAFKA-19902",
+    "KAFKA-20312",
+    "KAFKA-20434",
+    "KAFKA-20442",
+    "KAFKA-16262"
+  ],
+  "sections": [
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 4,
+      "rate": 0.129,
+      "position": 0.0
+    },
+    {
+      "heading": "Proposed Fix",
+      "key": "proposed fix",
+      "count": 3,
+      "rate": 0.097,
+      "position": 10.0
+    },
+    {
+      "heading": "Expected behavior",
+      "key": "expected behavior",
+      "count": 2,
+      "rate": 0.065,
+      "position": 2.5
+    },
+    {
+      "heading": "Files",
+      "key": "files",
+      "count": 2,
+      "rate": 0.065,
+      "position": 0.0
+    },
+    {
+      "heading": "Steps to Reproduce",
+      "key": "steps to reproduce",
+      "count": 2,
+      "rate": 0.065,
+      "position": 8.5
+    },
+    {
+      "heading": "Impact",
+      "key": "impact",
+      "count": 2,
+      "rate": 0.065,
+      "position": 13.0
+    }
+  ],
+  "conditionals": [],
+  "discriminative": {},
+  "chars_median": 1451.0,
+  "chars_p25": 928.0,
+  "chars_p75": 2171.0,
+  "title_words_median": 9.0,
+  "title_prefixes": [
+    [
+      "[Gradle]",
+      0.032
+    ],
+    [
+      "[Java-client]",
+      0.032
+    ],
+    [
+      "Consumer/",
+      0.032
+    ]
+  ],
+  "label_rate": 0.097,
+  "labels_per_ticket_median": 0.0,
+  "common_labels": [
+    [
+      "Gradle",
+      0.032
+    ],
+    [
+      "gradle",
+      0.032
+    ],
+    [
+      "transaction",
+      0.032
+    ],
+    [
+      "beginner",
+      0.032
+    ],
+    [
+      "newbie",
+      0.032
+    ]
+  ],
+  "label_groups": [],
+  "list_rate": 0.548,
+  "checkbox_rate": 0.0,
+  "code_rate": 0.323,
+  "image_rate": 0.065,
+  "link_rate": 0.29,
+  "cross_ref_rate": 0.323,
+  "assignee_rate": 0.903,
+  "language": "en",
+  "note_codes": []
+}

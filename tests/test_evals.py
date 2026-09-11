@@ -43,7 +43,7 @@ from ticket_ai_mcp.evals.metrics import (
     score_board,
     wrong_language,
 )
-from ticket_ai_mcp.evals.render import render, render_markdown
+from ticket_ai_mcp.evals.render import render, render_html, render_markdown
 from ticket_ai_mcp.evals.runner import CaseRun, read_runs, run_case, run_suite, write_runs
 from ticket_ai_mcp.profile import Profile
 from ticket_ai_mcp.writers.base import WriterError
@@ -806,3 +806,40 @@ def test_the_report_shows_spread_timing_language_and_findings():
     assert "invented" in text and "Impact" in text
     assert "wrong one" in text
     assert "no_labels" in text
+
+
+def test_the_html_page_is_self_contained():
+    html = render_html(_report())
+    assert html.startswith("<!doctype html>")
+    # Nothing to fetch: the bucket serves this file and nothing else.
+    for tag in ("<script", "<link", "src=", "@import"):
+        assert tag not in html
+
+
+def test_the_html_page_escapes_what_came_from_a_board():
+    from ticket_ai_mcp.evals.metrics import Report
+
+    nasty = Report(
+        model='<script>alert("x")</script>',
+        boards=(),
+        runs=1,
+        failed=0,
+        alignment=Spread.of([0.5]),
+    )
+    html = render_html(nasty)
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_the_html_page_marks_a_failure_and_names_the_reason():
+    base = Baseline.of(_report(alignment=0.90))
+    html = render_html(_report(alignment=0.50), compare(_report(alignment=0.50), base))
+    assert 'class="fail"' in html
+    assert "below the baseline" in html
+
+
+def test_eval_writes_the_page_where_it_was_asked_to(tmp_path, capsys):
+    dataset, runs = _tiny_suite(tmp_path)
+    page = tmp_path / "out" / "index.html"
+    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs), "--html", str(page)]) == 0
+    assert page.read_text(encoding="utf-8").startswith("<!doctype html>")

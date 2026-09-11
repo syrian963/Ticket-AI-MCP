@@ -242,7 +242,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
     from .evals.baseline import Baseline, compare
     from .evals.dataset import load_suite
     from .evals.metrics import score
-    from .evals.render import render, render_markdown
+    from .evals.render import render, render_html, render_markdown
     from .evals.runner import Progress, read_runs, run_suite, write_runs
 
     boards = load_suite(Path(args.dataset) if args.dataset else None)
@@ -279,6 +279,10 @@ def cmd_eval(args: argparse.Namespace) -> int:
         verdict = compare(report, Baseline.load(baseline_path), tolerance=args.tolerance)
 
     print(render_markdown(report, verdict) if args.markdown else render(report, verdict))
+    if args.html:
+        Path(args.html).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.html).write_text(render_html(report, verdict), encoding="utf-8")
+        print(f"  wrote {args.html}", file=sys.stderr)
 
     if args.judge:
         from .evals.calibration import agreement, load_labels, render_agreement
@@ -531,6 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--update-baseline", action="store_true", help="write the baseline instead")
     ev.add_argument("--tolerance", type=float, default=TOLERANCE_DEFAULT)
     ev.add_argument("--markdown", action="store_true", help="a table for a pull request")
+    ev.add_argument("--html", help="also write a self-contained page here")
     ev.add_argument("--judge", action="store_true", help="also ask a model if drafts are on topic")
     ev.add_argument("--labels", help="human labels to calibrate the judge against")
     ev.add_argument("--writer")

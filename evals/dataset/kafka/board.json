@@ -1,0 +1,6 @@
+{
+  "tracker": "jira",
+  "project": "KAFKA",
+  "url": "https://issues.apache.org/jira",
+  "fetched_at": "2026-09-11"
+}

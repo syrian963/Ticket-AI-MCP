@@ -5,7 +5,7 @@
 ![CLI commands](https://img.shields.io/badge/CLI%20commands-11-8957e5?style=for-the-badge&labelColor=22272e)
 ![trackers](https://img.shields.io/badge/trackers-GitLab%20%7C%20Jira%20%7C%20GitHub-8957e5?style=for-the-badge&labelColor=22272e)
 
-![tests](https://img.shields.io/badge/tests-473-238636?style=for-the-badge&labelColor=22272e)
+![tests](https://img.shields.io/badge/tests-477-238636?style=for-the-badge&labelColor=22272e)
 ![coverage](https://img.shields.io/badge/coverage-93%25-238636?style=for-the-badge&labelColor=22272e)
 ![python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-484f58?style=for-the-badge&labelColor=22272e&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-484f58?style=for-the-badge&labelColor=22272e)
@@ -367,10 +367,18 @@ whose human half was generated compares one model to another. Without
 `--labels`, the judge line prints `uncalibrated` every time rather than
 documenting the caveat once and letting the number travel without it.
 
-The dataset is 85 cases over six public boards. **Thirty of them are German**,
-from `kern-ux/pattern-library` and `fitko/fim/portal` on gitlab.opencode.de, a
-public German GitLab that reads without a token. That matters because `compose`
-has a whole German branch in its system prompt and nothing measured it before.
+The dataset is 99 cases over seven public boards. **Thirty are German**, from
+`kern-ux/pattern-library` and `fitko/fim/portal` on gitlab.opencode.de, a public
+German GitLab that reads without a token. One board is Jira (`KAFKA` on
+issues.apache.org), and two boards write **pure prose with no recurring sections
+at all**.
+
+That is not variety for its own sake. `compose` branches on each of them: a
+German prompt, a tracker abstraction, and a skeleton block that either lists
+sections or tells the model to write no headings at all. CI asserts all three
+survive, because a dataset that lost one would stop measuring it **without the
+average moving**, and the loss would be invisible in the one number people read.
+
 kern-ux is why `jsonl_lines` exists: one of its
 tickets carries a literal U+2028, `str.splitlines` treats that as a line break
 and `json.dumps` does not escape it, so a valid file read as a truncated record

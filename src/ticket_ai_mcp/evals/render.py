@@ -114,3 +114,90 @@ def render_markdown(report: Report, verdict: Verdict | None = None) -> str:
         out += [f"- {complaint}" for complaint in verdict.complaints]
         out += [f"- _{note}_" for note in verdict.notes]
     return "\n".join(out)
+
+
+HTML_STYLE = """
+  :root { color-scheme: light dark; --line: #8884; --bad: #c0392b; --good: #1e8449; }
+  body { font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 2rem auto;
+         max-width: 60rem; padding: 0 1rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 .2rem; }
+  p.sub { margin: 0 0 1.5rem; opacity: .7; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 1.5rem; }
+  th, td { text-align: right; padding: .35rem .6rem; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--line); border-bottom: none; }
+  .fail { color: var(--bad); } .pass { color: var(--good); }
+  ul { padding-left: 1.2rem; } li { margin: .2rem 0; }
+  .note { opacity: .7; }
+"""
+
+
+def _esc(text: str) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def render_html(report: Report, verdict: Verdict | None = None, *, title: str = "eval") -> str:
+    """One self-contained page, because the report has to survive being hosted.
+
+    No stylesheet, no script, no font: the bucket behind CloudFront serves this
+    and nothing else, and a page that fetches assets would need a second upload
+    and a second cache rule for no gain. `color-scheme` is the whole theme
+    handling - the browser picks.
+    """
+    rows = []
+    for board in report.boards:
+        alignment = f"{board.alignment.mean:.3f}" if board.alignment else "-"
+        spread = (
+            f"±{board.alignment.stdev:.3f}"
+            if board.alignment and board.alignment.n > 1
+            else "-"
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{_esc(board.board)}</td><td>{board.runs}</td><td>{alignment}</td>"
+            f"<td>{spread}</td><td>{_pct(board.revised)}</td>"
+            f"<td>{_pct(board.invented_rate)}</td><td>{board.failed}</td>"
+            "</tr>"
+        )
+    total = f"{report.alignment.mean:.3f}" if report.alignment else "-"
+    rows.append(
+        f'<tr class="total"><td>total</td><td>{report.runs}</td><td>{total}</td>'
+        f"<td></td><td></td><td></td><td>{report.failed}</td></tr>"
+    )
+
+    body = [
+        f"<h1>{_esc(title)}</h1>",
+        f'<p class="sub">model {_esc(report.model)} &middot; {report.runs} runs</p>',
+        "<table><thead><tr><th>board</th><th>runs</th><th>alignment</th><th>spread</th>"
+        "<th>revised</th><th>invented</th><th>failed</th></tr></thead>",
+        "<tbody>" + "".join(rows) + "</tbody></table>",
+    ]
+
+    if verdict is not None:
+        state = "pass" if verdict.ok else "fail"
+        body.append(f'<p class="{state}"><strong>{state.upper()}</strong></p>')
+        if verdict.complaints:
+            body.append("<ul>" + "".join(f"<li>{_esc(c)}</li>" for c in verdict.complaints) + "</ul>")
+        if verdict.notes:
+            body.append(
+                '<ul class="note">' + "".join(f"<li>{_esc(n)}</li>" for n in verdict.notes) + "</ul>"
+            )
+
+    if report.findings:
+        body.append("<h1>findings</h1><ul>")
+        body.extend(f"<li>{_esc(code)} &times; {count}</li>" for code, count in report.findings)
+        body.append("</ul>")
+
+    return (
+        "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>{_esc(title)}</title><style>{HTML_STYLE}</style></head><body>"
+        + "".join(body)
+        + "</body></html>\n"
+    )
