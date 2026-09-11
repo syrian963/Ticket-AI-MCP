@@ -410,6 +410,7 @@ publish step skips itself when the role variable is unset.
 | [**thirty-boards.md**](docs/thirty-boards.md) | What running it against forty-three real boards, an MCP client, a browser and a clean install found. Almost all of it had full line coverage at the time |
 | [**what-it-produces.md**](docs/what-it-produces.md) | Five tickets it wrote, unedited, with the score each one got |
 | [**shipped-against-stalled.md**](docs/shipped-against-stalled.md) | How the two groups are split, and the guards that keep the comparison honest |
+| [**evaluating-compose.md**](docs/evaluating-compose.md) | The harness over the frozen dataset: what was held out and why, the two metrics `review_draft` does not have, why the gate tolerates noise, and what is still missing |
 | [**local-models.md**](docs/local-models.md) | Running the writer on a 2 GB local model: measured timings, and what it trades away |
 
 ### Verified against
