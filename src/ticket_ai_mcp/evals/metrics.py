@@ -17,6 +17,19 @@ cannot support.
 A failed run is excluded from every quality figure and counted separately.
 Folding an unreachable model into the mean would report an outage as a drop in
 quality, which is the one reading that would send someone to the wrong place.
+
+**The suite total is pooled by checks, not averaged over runs.** `alignment` is
+the share of *applicable* checks a draft passed, and how many apply differs by
+a factor of four across the dataset: inkscape runs nine checks a draft, the
+prose boards run two. A plain mean therefore lets a board that checks almost
+nothing carry as much weight as the strictest one, and a stub that writes
+English prose with no headings scores 1.000 on three boards for free. Measured
+over the whole dataset with such a stub, the plain mean reads 0.733 and the
+pooled figure 0.676.
+
+`docs/local-models.md` already said alignment is only comparable within a
+board. Pooling by checks is what that caveat means when a number has to span
+several of them anyway.
 """
 
 from __future__ import annotations
@@ -105,6 +118,7 @@ class BoardReport:
     runs: int
     failed: int
     alignment: Spread | None
+    checks: Spread | None
     per_case_stdev: Spread | None
     seconds: Spread | None
     revised: float
@@ -123,6 +137,10 @@ class Report:
     runs: int
     failed: int
     alignment: Spread | None
+    # Share of all applicable checks passed, across every run. None when
+    # nothing was checked at all, which is not the same as nothing passing.
+    pooled: float | None = None
+    checks: int = 0
     findings: tuple[tuple[str, int], ...] = field(default=())
 
     @property
@@ -165,6 +183,7 @@ def score_board(board: Board, runs: list[CaseRun]) -> BoardReport:
         runs=len(runs),
         failed=failed,
         alignment=Spread.of(r.alignment or 0.0 for r in good),
+        checks=Spread.of(float(r.checks_run) for r in good),
         per_case_stdev=Spread.of(spreads),
         seconds=Spread.of(r.seconds for r in good),
         revised=_rate(sum(1 for r in good if r.attempts > 1), len(good)),
@@ -197,6 +216,13 @@ def score(boards: Iterable[Board], runs: Iterable[CaseRun]) -> Report:
     for run in good:
         findings.update(run.findings)
 
+    total_checks = sum(r.checks_run for r in good)
+    pooled = (
+        round(sum((r.alignment or 0.0) * r.checks_run for r in good) / total_checks, 4)
+        if total_checks
+        else None
+    )
+
     models = {r.model for r in used if r.model}
     return Report(
         # A report over two models mixed together is a number nobody can act
@@ -206,5 +232,7 @@ def score(boards: Iterable[Board], runs: Iterable[CaseRun]) -> Report:
         runs=len(used),
         failed=sum(1 for r in used if not r.ok),
         alignment=Spread.of(r.alignment or 0.0 for r in good),
+        pooled=pooled,
+        checks=total_checks,
         findings=tuple(findings.most_common()),
     )

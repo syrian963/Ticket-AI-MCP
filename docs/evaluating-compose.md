@@ -99,6 +99,34 @@ cannot support. `--repeats` runs each case several times; the report prints the
 deviation next to the mean, and a single observation reports *no* spread rather
 than a spread of zero.
 
+## The total is pooled, and finding out why took a stub
+
+Running the whole dataset through `compose` with a stub writer - a fixed
+English paragraph, no headings, no model - is the first thing that ever
+exercised all ten profiles. It produced a number nobody should trust and one
+that is worth keeping:
+
+| Board | Checks per draft | Alignment |
+|---|---|---|
+| inkscape | 9 | 0.381 |
+| gitlab-runner | 7 | 0.923 |
+| fitko-fim, gitlab-cli | 5 | 0.554, 0.963 |
+| fdroid, kern-ux | 3 | 0.800, 0.549 |
+| cassandra, hibernate, veloren | 2 | **1.000** |
+
+**A board that checks two things gives a stub full marks.** There is nothing to
+fail: no sections are expected, so no section can be missing. inkscape expects
+five and runs nine checks, so the same stub scores 0.381.
+
+A plain mean over runs therefore hands the most weight to the boards that check
+the least. Pooled by checks - every applicable check counted once, wherever it
+ran - the same stub reads **0.676** against a plain mean of **0.733**.
+
+`docs/local-models.md` had already said alignment is only comparable within a
+board. The gate compares across ten, so it uses the pooled figure, and every
+board line prints its check count next to its score: 1.000 over two checks and
+1.000 over nine are not the same claim, and only that line says so.
+
 ## The gate tolerates noise on purpose
 
 `evals/baseline.json` holds a committed figure, and a drop has to exceed **0.05
