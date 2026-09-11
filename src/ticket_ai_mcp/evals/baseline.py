@@ -20,12 +20,18 @@ and the level number is the one nobody investigates.
 **The total compared here is the pooled figure, not the mean over runs.**
 Boards differ fourfold in how many checks apply to a draft, so a plain mean
 lets the boards that check least carry the most weight. See `metrics`.
+
+**Coverage is gated too, per board.** It exists because alignment can be raised
+by writing less, so gating on alignment alone would leave the one figure that
+cannot be gamed out of the only place it would stop a regression. A board whose
+drafts quietly stop writing the skeleton keeps its alignment and loses its
+coverage, which is exactly the change worth catching.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .metrics import Report
@@ -46,6 +52,10 @@ class Baseline:
     alignment: float
     stdev: float
     boards: dict[str, float]
+    # Per board, because there is no sensible suite-wide coverage: the boards
+    # without a skeleton have none at all, and averaging over the rest would
+    # move whenever the dataset gains a prose board.
+    coverage: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def of(cls, report: Report) -> Baseline:
@@ -57,6 +67,7 @@ class Baseline:
             alignment=report.pooled,
             stdev=report.alignment.stdev,
             boards={b.board: b.alignment.mean for b in report.boards if b.alignment},
+            coverage={b.board: b.coverage.mean for b in report.boards if b.coverage},
         )
 
     @classmethod
@@ -68,6 +79,7 @@ class Baseline:
             alignment=float(data["alignment"]),
             stdev=float(data.get("stdev", 0.0)),
             boards={str(k): float(v) for k, v in (data.get("boards") or {}).items()},
+            coverage={str(k): float(v) for k, v in (data.get("coverage") or {}).items()},
         )
 
     def save(self, path: Path) -> None:
@@ -80,6 +92,7 @@ class Baseline:
                     "alignment": self.alignment,
                     "stdev": self.stdev,
                     "boards": dict(sorted(self.boards.items())),
+                    "coverage": dict(sorted(self.coverage.items())),
                 },
                 indent=2,
             )
@@ -136,6 +149,22 @@ def compare(report: Report, baseline: Baseline, *, tolerance: float = TOLERANCE)
             complaints.append(
                 f"board {slug} {board.alignment.mean:.3f} is {board_drop:.3f} "
                 f"below its baseline {was:.3f}"
+            )
+
+    for slug, was in sorted(baseline.coverage.items()):
+        board = seen.get(slug)
+        if board is None or board.coverage is None:
+            # Already complained about above if the board vanished entirely. A
+            # board that ran but lost its skeleton is a different thing and
+            # says so.
+            if board is not None:
+                complaints.append(f"board {slug} no longer has a skeleton to cover")
+            continue
+        coverage_drop = was - board.coverage.mean
+        if coverage_drop > tolerance:
+            complaints.append(
+                f"board {slug} covers {board.coverage.mean:.3f} of its skeleton, "
+                f"{coverage_drop:.3f} below its baseline {was:.3f}"
             )
 
     for slug in sorted(seen):

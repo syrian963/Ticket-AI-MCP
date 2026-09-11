@@ -114,22 +114,38 @@ def render(report: Report, verdict: Verdict | None = None) -> str:
     return "\n".join(lines)
 
 
+def _cmp(theirs: Spread | None, ours: Spread | None) -> str:
+    """A figure against what that board's own tickets manage."""
+    if ours is None:
+        return "-"
+    if theirs is None:
+        return f"{ours.mean:.3f}"
+    return f"{ours.mean:.3f} / {theirs.mean:.3f}"
+
+
 def render_markdown(report: Report, verdict: Verdict | None = None) -> str:
-    """The same figures as a table, for pasting into a pull request."""
+    """The same figures as a table, for pasting into a pull request.
+
+    Two columns carry a slash: the draft's figure and the board's own tickets.
+    A column of bare scores invites reading them against 1.0, and nothing in
+    this dataset reaches 1.0 - not even the people whose board it is.
+    """
     rows = [
-        "| board | runs | alignment | spread | revised | invented | failed |",
+        "| board | runs | checks | alignment / theirs | coverage / theirs | invented | failed |",
         "|---|---|---|---|---|---|---|",
     ]
     for board in report.boards:
-        alignment = f"{board.alignment.mean:.3f}" if board.alignment else "-"
-        spread = f"±{board.alignment.stdev:.3f}" if board.alignment and board.alignment.n > 1 else "-"
+        checks = f"{board.checks.median:.0f}" if board.checks else "-"
         rows.append(
-            f"| {board.board} | {board.runs} | {alignment} | {spread} | "
-            f"{_pct(board.revised)} | {_pct(board.invented_rate)} | {board.failed} |"
+            f"| {board.board} | {board.runs} | {checks} | "
+            f"{_cmp(board.human, board.alignment)} | "
+            f"{_cmp(board.human_coverage, board.coverage)} | "
+            f"{_pct(board.invented_rate)} | {board.failed} |"
         )
     total = f"{report.pooled:.3f}" if report.pooled is not None else "-"
     rows.append(
-        f"| **total (pooled)** | **{report.runs}** | **{total}** | | | | **{report.failed}** |"
+        f"| **total (pooled)** | **{report.runs}** | **{report.checks}** | "
+        f"**{total}** | | | **{report.failed}** |"
     )
 
     out = [f"**model:** `{report.model}`", "", *rows]
@@ -176,30 +192,28 @@ def render_html(report: Report, verdict: Verdict | None = None, *, title: str = 
     """
     rows = []
     for board in report.boards:
-        alignment = f"{board.alignment.mean:.3f}" if board.alignment else "-"
-        spread = (
-            f"±{board.alignment.stdev:.3f}"
-            if board.alignment and board.alignment.n > 1
-            else "-"
-        )
+        checks = f"{board.checks.median:.0f}" if board.checks else "-"
         rows.append(
             "<tr>"
-            f"<td>{_esc(board.board)}</td><td>{board.runs}</td><td>{alignment}</td>"
-            f"<td>{spread}</td><td>{_pct(board.revised)}</td>"
+            f"<td>{_esc(board.board)}</td><td>{board.runs}</td><td>{checks}</td>"
+            f"<td>{_esc(_cmp(board.human, board.alignment))}</td>"
+            f"<td>{_esc(_cmp(board.human_coverage, board.coverage))}</td>"
             f"<td>{_pct(board.invented_rate)}</td><td>{board.failed}</td>"
             "</tr>"
         )
-    total = f"{report.alignment.mean:.3f}" if report.alignment else "-"
+    total = f"{report.pooled:.3f}" if report.pooled is not None else "-"
     rows.append(
-        f'<tr class="total"><td>total</td><td>{report.runs}</td><td>{total}</td>'
-        f"<td></td><td></td><td></td><td>{report.failed}</td></tr>"
+        f'<tr class="total"><td>total (pooled)</td><td>{report.runs}</td>'
+        f"<td>{report.checks}</td><td>{total}</td>"
+        f"<td></td><td></td><td>{report.failed}</td></tr>"
     )
 
     body = [
         f"<h1>{_esc(title)}</h1>",
         f'<p class="sub">model {_esc(report.model)} &middot; {report.runs} runs</p>',
-        "<table><thead><tr><th>board</th><th>runs</th><th>alignment</th><th>spread</th>"
-        "<th>revised</th><th>invented</th><th>failed</th></tr></thead>",
+        "<table><thead><tr><th>board</th><th>runs</th><th>checks</th>"
+        "<th>alignment / theirs</th><th>coverage / theirs</th>"
+        "<th>invented</th><th>failed</th></tr></thead>",
         "<tbody>" + "".join(rows) + "</tbody></table>",
     ]
 
