@@ -22,11 +22,20 @@ one number per board, nothing is written to disk, and no profile survives the
 run - so it is worth pointing at a dozen boards to see a distribution rather
 than at one board to keep it.
 
-**The number moves with the sample.** gitlab-runner reads 53% at `--sample 40`
-and 68% at `--sample 60`, which puts the same board on either side of the
-threshold depending on how much of its history was looked at. That is a fact
-about mining a ranked subset, not a bug, and it is a second reason not to
-treat a figure from here as settled: it says which boards are worth collecting
+**The answer moves with the sample, and so does the path it came by.**
+gitlab-runner, on three sizes of the same board:
+
+    n=15   skeleton 0                top section 53%
+    n=20   skeleton 1  (by rate)     top section 65%
+    n=32   skeleton 3  (by pairs)    top section 38%
+
+It does not only cross the threshold in both directions. It changes *which*
+rule carried it: at twenty exemplars one section is common enough on its own,
+at thirty-two none is and three pairs are instead. Both readings are correct
+about the tickets they saw.
+
+That is a fact about mining a ranked subset, not a bug, and it is why a figure
+from here is not settled. Use it to decide which boards are worth collecting
 properly, and nothing more.
 
     python tools/probe_section_rates.py
@@ -124,10 +133,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     print(f"skeleton threshold is 60%; flagging anything from {NEAR_LOW:.0%} to {NEAR_HIGH:.0%}\n")
-    for board in GITLAB + (args.gitlab or []):
-        probe("gitlab", board, sample=args.sample, keep=args.keep)
-    for board in JIRA + (args.jira or []):
-        probe("jira", board, sample=args.sample, keep=args.keep)
+    fleets = (
+        ("gitlab", GITLAB + (args.gitlab or [])),
+        ("jira", JIRA + (args.jira or [])),
+    )
+    for kind, boards in fleets:
+        # Naming a board that is already in the list should not probe it twice;
+        # dict keeps the order they were written in.
+        for board in dict.fromkeys(boards):
+            probe(kind, board, sample=args.sample, keep=args.keep)
     return 0
 
 

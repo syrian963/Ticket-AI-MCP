@@ -19,6 +19,17 @@ profile describes, so relearning a board between two runs changes the score with
 nothing about the model having changed, and the comparison then measures the
 wrong thing while looking exactly like a comparison.
 
+**And a board's shape is less stable than it looks.** The same board, mined at
+three sample sizes:
+
+    gitlab-runner   n=15   skeleton 0                top section 53%
+                    n=20   skeleton 1  (by rate)     top section 65%
+                    n=32   skeleton 3  (by pairs)    top section 38%
+
+It crosses the threshold in both directions and changes which rule carried it.
+Every reading is correct about the tickets it saw, which is precisely why the
+profile has to be a file rather than something recomputed per run.
+
 | Board | Cases | Tracker | Language | Skeleton | Sections seen |
 |---|---|---|---|---|---|
 | inkscape | 19 | GitLab | English | 5 | 7 |
