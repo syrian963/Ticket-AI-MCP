@@ -42,6 +42,7 @@ from ticket_ai_mcp.evals.metrics import (
     invented_sections,
     score,
     score_board,
+    skeleton_coverage,
     wrong_language,
 )
 from ticket_ai_mcp.evals.render import render, render_html, render_markdown
@@ -438,6 +439,8 @@ def _report(
                 alignment=Spread.of([value, value]),
                 checks=Spread.of([float(checks), float(checks)]),
                 human=Spread.of([0.9, 0.9]),
+                coverage=Spread.of([0.5, 0.5]),
+                human_coverage=Spread.of([0.9, 0.9]),
                 per_case_stdev=None,
                 seconds=None,
                 revised=0.0,
@@ -951,3 +954,50 @@ def test_the_ceiling_reaches_the_report_and_the_render():
     assert report.boards[0].human is not None
     assert "human" in render(report)
     assert "own tickets" in render(report)
+
+
+# ------------------------------------------- coverage, which omission cannot game
+
+
+def test_coverage_cannot_be_raised_by_writing_less():
+    # The whole point. alignment goes up when a draft writes nothing, because
+    # fewer checks apply. Coverage's denominator is the skeleton, so it does
+    # not move.
+    board = _board_with_sections("Summary", "Steps")
+    assert skeleton_coverage("nothing at all, just prose", board) == 0.0
+    assert skeleton_coverage("## Summary\ntext", board) == 0.5
+    assert skeleton_coverage("## Summary\ntext\n## Steps\nmore", board) == 1.0
+
+
+def test_coverage_is_undefined_on_a_board_with_no_skeleton():
+    # Not 0.0: a prose board asked for no headings, and scoring a draft zero
+    # for obeying that would punish it for being right.
+    assert skeleton_coverage("## Anything\nx", _board_with_sections()) is None
+
+
+def test_coverage_counts_the_skeleton_not_the_whole_vocabulary():
+    # The opposite choice from invented_sections, on purpose. Invention needs
+    # the full vocabulary; coverage needs what the prompt actually asked for.
+    from ticket_ai_mcp.profile import Section
+
+    board = _board_with_sections("Summary")
+    rare = Section(heading="Workaround", key="workaround", count=3, rate=0.3, position=2)
+    board = replace(
+        board, profile=replace(board.profile, sections=(*board.profile.sections, rare))
+    )
+    assert [h for h, _ in board.profile.skeleton()] == ["Summary"]
+    assert skeleton_coverage("## Workaround\nx", board) == 0.0
+    assert invented_sections("## Workaround\nx", board) == ()
+
+
+def test_the_report_shows_coverage_against_the_board_own_tickets():
+    board = _board_with_sections("Summary")
+    good = replace(_case("#1"), reference="## Summary\n" + ("text " * 50))
+    board = replace(board, cases=(good,))
+    report = score([board], [_run("#1", body="no headings here at all")])
+
+    assert report.boards[0].coverage is not None
+    assert report.boards[0].coverage.mean == 0.0
+    assert report.boards[0].human_coverage is not None
+    assert report.boards[0].human_coverage.mean == 1.0
+    assert "of the skeleton" in render(report)

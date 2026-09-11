@@ -52,6 +52,14 @@ def _board_lines(board: BoardReport) -> list[str]:
             f"    human        {board.human.mean:.3f} on this board's own tickets "
             f"[{board.human.low:.2f}-{board.human.high:.2f}]"
         )
+    if board.coverage is not None and board.human_coverage is not None:
+        # Printed together, because the pair is the point: coverage alone says
+        # little, coverage against what that board's own tickets manage says
+        # whether the draft did what it was told.
+        lines.append(
+            f"    coverage     {board.coverage.mean:.3f} of the skeleton, "
+            f"their own tickets {board.human_coverage.mean:.3f}"
+        )
     if board.per_case_stdev is not None:
         lines.append(
             f"    same case    ±{board.per_case_stdev.mean:.3f} on average "
