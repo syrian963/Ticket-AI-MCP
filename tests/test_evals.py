@@ -28,6 +28,7 @@ from ticket_ai_mcp.evals.dataset import (
     Board,
     Case,
     DatasetError,
+    jsonl_lines,
     load_board,
     load_suite,
     write_board,
@@ -661,3 +662,39 @@ def test_labels_are_read_from_a_file_with_the_line_number_on_errors(tmp_path):
     )
     with pytest.raises(ValueError, match=r"labels\.jsonl:2"):
         load_labels(path)
+
+
+# ----------------------------------------------------- the U+2028 line splitter
+
+
+LINE_SEPARATOR = chr(0x2028)
+
+
+def test_a_record_containing_u2028_is_one_record_not_two(tmp_path):
+    # Found on the kern-ux board: a real German ticket carries a literal
+    # U+2028. str.splitlines() breaks on it, json.dumps does not escape it, so
+    # the file was valid JSONL and the reader cut one record in half and
+    # blamed the file.
+    text = json.dumps(
+        {**_case().to_dict(), "reference": f"erste Zeile{LINE_SEPARATOR}zweite Zeile"},
+        ensure_ascii=False,
+    )
+    assert len(text.splitlines()) == 2
+    assert len([line for line in jsonl_lines(text) if line.strip()]) == 1
+
+    directory = _write_board(tmp_path, cases_text=text + "\n")
+    board = load_board(directory)
+    assert LINE_SEPARATOR in board.cases[0].reference
+
+
+def test_results_and_labels_survive_u2028_too(tmp_path):
+    runs = tmp_path / "runs.jsonl"
+    write_runs(runs, [replace(_run(), body=f"vorher{LINE_SEPARATOR}nachher")])
+    assert len(read_runs(runs)) == 1
+
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps({"board": f"a{LINE_SEPARATOR}b", "case": "#1", "verdict": "on_topic"}) + "\n",
+        encoding="utf-8",
+    )
+    assert len(load_labels(labels)) == 1

@@ -21,6 +21,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from .dataset import jsonl_lines
+
 
 @dataclass(frozen=True, slots=True)
 class Label:
@@ -38,7 +40,7 @@ class Label:
 
 def load_labels(path: Path) -> list[Label]:
     out: list[Label] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for number, line in enumerate(jsonl_lines(path.read_text(encoding="utf-8")), start=1):
         if not line.strip():
             continue
         try:

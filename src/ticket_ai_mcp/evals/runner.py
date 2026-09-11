@@ -28,7 +28,7 @@ from pathlib import Path
 
 from ..compose import compose
 from ..writers.base import Writer, WriterError
-from .dataset import Board, Case
+from .dataset import Board, Case, jsonl_lines
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +162,7 @@ def write_runs(path: Path, runs: Iterable[CaseRun]) -> int:
 def read_runs(path: Path) -> list[CaseRun]:
     """Read a results file back, skipping nothing quietly."""
     out: list[CaseRun] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for number, line in enumerate(jsonl_lines(path.read_text(encoding="utf-8")), start=1):
         if not line.strip():
             continue
         try:

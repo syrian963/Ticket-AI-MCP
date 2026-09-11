@@ -36,6 +36,23 @@ BOARD_FILE = "board.json"
 PROFILE_FILE = "profile.json"
 CASES_FILE = "cases.jsonl"
 
+NEWLINE = chr(10)
+
+
+def jsonl_lines(text: str) -> list[str]:
+    """Split JSONL on newlines only, which `str.splitlines` does not do.
+
+    `splitlines` also breaks on U+2028, U+2029, U+0085 and three ASCII
+    separators, and `json.dumps` escapes none of them. A German ticket in the
+    kern-ux board contains a literal U+2028, so the file was valid JSONL and
+    the reader cut one record in half and reported it as invalid JSON.
+
+    Nothing about the failure pointed at the reader: the message named the
+    file, the line number and a column, and the record it quoted really was
+    truncated. Anything reading a record per line has to use this.
+    """
+    return text.split(NEWLINE)
+
 
 class DatasetError(RuntimeError):
     """A case or board on disk is not usable, and says which one."""
@@ -130,7 +147,7 @@ def load_board(directory: Path) -> Board:
 
     cases: list[Case] = []
     seen: set[str] = set()
-    for number, line in enumerate(cases_path.read_text(encoding="utf-8").splitlines(), start=1):
+    for number, line in enumerate(jsonl_lines(cases_path.read_text(encoding="utf-8")), start=1):
         if not line.strip():
             continue
         where = f"{cases_path}:{number}"
