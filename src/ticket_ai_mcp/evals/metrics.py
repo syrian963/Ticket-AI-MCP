@@ -98,6 +98,31 @@ def invented_sections(body: str, board: Board) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def skeleton_coverage(body: str, board: Board) -> float | None:
+    """How much of the skeleton the draft actually wrote, out of a fixed total.
+
+    The companion to `alignment`, and the reason it exists is that alignment's
+    denominator moves: it is the share of *applicable* checks passed, and a
+    draft decides which apply to it by what it writes. Coverage cannot be
+    gained by omission, because the denominator is the skeleton the prompt
+    handed over and writing nothing scores zero.
+
+    Measured against the skeleton rather than every observed section, which is
+    the opposite choice from `invented_sections` and for the opposite reason.
+    Invention asks what the draft added that the board has never used, so it
+    needs the full vocabulary. Coverage asks whether the draft did what it was
+    told, so it needs exactly what the prompt asked for.
+
+    None on a board with no skeleton. There is nothing to cover, and returning
+    0.0 would mark every prose draft down for obeying its instructions.
+    """
+    wanted = {normalise_heading(head) for head, _ in board.profile.skeleton()}
+    if not wanted:
+        return None
+    written = {normalise_heading(head) for head in headings(body)}
+    return round(len(wanted & written) / len(wanted), 4)
+
+
 def wrong_language(body: str, board: Board) -> bool:
     """Whether the draft is in a language this board does not write in.
 
@@ -146,6 +171,9 @@ class BoardReport:
     checks: Spread | None
     # What the board's own tickets score. See `ceiling`.
     human: Spread | None
+    # Share of the skeleton written, and the same for the board's own tickets.
+    coverage: Spread | None
+    human_coverage: Spread | None
     per_case_stdev: Spread | None
     seconds: Spread | None
     revised: float
@@ -186,6 +214,7 @@ def score_board(board: Board, runs: list[CaseRun]) -> BoardReport:
     cases = {c.key: c for c in board.cases}
 
     by_case: dict[str, list[float]] = {}
+    covered: list[float] = []
     invented_hits = 0
     invented_counter: Counter[str] = Counter()
     language_hits = 0
@@ -197,6 +226,9 @@ def score_board(board: Board, runs: list[CaseRun]) -> BoardReport:
         if found:
             invented_hits += 1
             invented_counter.update(found)
+        share = skeleton_coverage(run.body, board)
+        if share is not None:
+            covered.append(share)
         if wrong_language(run.body, board):
             language_hits += 1
         findings.update(run.findings)
@@ -212,6 +244,12 @@ def score_board(board: Board, runs: list[CaseRun]) -> BoardReport:
         alignment=Spread.of(r.alignment or 0.0 for r in good),
         checks=Spread.of(float(r.checks_run) for r in good),
         human=ceiling(board),
+        coverage=Spread.of(covered),
+        human_coverage=Spread.of(
+            share
+            for share in (skeleton_coverage(c.reference, board) for c in board.cases)
+            if share is not None
+        ),
         per_case_stdev=Spread.of(spreads),
         seconds=Spread.of(r.seconds for r in good),
         revised=_rate(sum(1 for r in good if r.attempts > 1), len(good)),

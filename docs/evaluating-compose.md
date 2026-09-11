@@ -189,6 +189,42 @@ is the tool's central number, quoted in the README and returned by the MCP
 server, and changing it changes every claim built on it. The harness's job was
 to make the property visible, and it is now on every report.
 
+**What the harness could do is add a figure omission cannot game.** Coverage is
+the share of the skeleton a draft actually wrote. The denominator is what the
+prompt handed over, so writing nothing scores zero and there is no way up
+except doing the work.
+
+| Board | Stub | Human | Coverage: stub | Coverage: human |
+|---|---|---|---|---|
+| inkscape | 0.381 | 0.945 | 0.000 | 0.958 |
+| fdroid | 0.800 | 0.902 | 0.000 | 0.767 |
+| fitko-fim | 0.554 | 0.828 | 0.000 | 0.590 |
+| gitlab-cli | **0.963** | 0.887 | 0.000 | 0.406 |
+| gitlab-runner | **0.923** | 0.886 | 0.000 | 0.256 |
+| kern-ux | 0.549 | 0.761 | 0.000 | 0.353 |
+| cassandra, hibernate, kafka, veloren | — | — | *no skeleton* | *no skeleton* |
+
+**Both boards where alignment inverted are separated correctly by coverage**,
+by 0.406 and 0.256. On every sectioned board the stub scores zero and the
+board's own tickets do not.
+
+Note how far the human numbers are from 1.0. On gitlab-runner the board's own
+tickets contain a quarter of their own skeleton, which is a fact about the
+skeleton: it comes from conditional pairs there, not from sections most
+tickets carry.
+
+### The three boards nothing structural can decide
+
+`cassandra`, `hibernate`, `kafka` and `veloren` have no skeleton, so there is
+nothing to cover, and a stub that writes prose with no headings is **doing
+exactly what the prompt told it to**. Structure cannot separate it from a real
+ticket, and it should not try.
+
+What separates them is whether the text is about the title, and that is the one
+question the judge is asked. So the judge is not a refinement on these boards.
+**It is the only signal there is**, which is also why its calibration is the
+thing still missing rather than a nicety.
+
 ## The gate tolerates noise on purpose
 
 `evals/baseline.json` holds a committed figure, and a drop has to exceed **0.05
