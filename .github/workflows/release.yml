@@ -88,3 +88,65 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A release has more than one destination, so it can fail half way.
+          # Without this, the re-run that would finish the job dies on the part
+          # that already succeeded.
+          skip-existing: true
+
+  registry:
+    # After PyPI, because the manifest names a version and the registry checks
+    # that the version is really there.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      # The same mechanism as trusted publishing above: no token anywhere.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mcp-publisher
+        run: |
+          version=$(gh release view --repo modelcontextprotocol/registry \
+            --json tagName --jq .tagName)
+          curl -fsSL -o publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${version}/mcp-publisher_linux_amd64.tar.gz"
+          tar xzf publisher.tar.gz mcp-publisher
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: The manifest has to say what the tag says
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(python -c "import json;print(json.load(open('server.json'))['version'])")
+          echo "tag $tag, server.json $declared"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::server.json says $declared and the tag says $tag"
+            exit 1
+          fi
+      - name: Publish to the MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
+  github_release:
+    # The Releases page is the third destination, and the one most easily
+    # forgotten: a tag on its own does not create a release, so the page can
+    # sit several versions behind while the badge says otherwise. The notes
+    # come from the changelog, so there is only ever one text.
+    needs: registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create it if it is not there
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag already has a release"
+            exit 0
+          fi
+          python tools/release_notes.py "$tag" > notes.md
+          gh release create "$tag" --title "$tag" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

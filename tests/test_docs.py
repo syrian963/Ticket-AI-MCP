@@ -468,3 +468,64 @@ class TestTheBadgesAreNotDecoration:
         assert self.badge("tests") == str(collected), (
             f"the badge says {self.badge('tests')} tests, the suite has {collected}"
         )
+
+
+class TestReleaseNotes:
+    """The notes a release page shows, taken from the changelog.
+
+    This started as Python indented inside a YAML `run:` block, with the
+    here-document's own terminator indented as well - so it never terminated,
+    and the interpreter got an IndentationError from the first line. The YAML
+    parsed and a grep found every word of it. Only running it said otherwise,
+    which is why it is a file now.
+    """
+
+    def notes_for(self, version: str, changelog: str) -> str:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "release_notes", ROOT / "tools" / "release_notes.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.notes(changelog, version)
+
+    SAMPLE = (
+        "# Changelog\n\n"
+        "## [0.2.0] - 2026-10-01\n\n"
+        "The newer one.\n\n"
+        "## [0.1.0] - 2026-09-10\n\n"
+        "The first one.\n\n"
+        "### A heading inside it\n\n"
+        "- a bullet\n"
+    )
+
+    def test_it_stops_at_the_next_version(self):
+        out = self.notes_for("0.1.0", self.SAMPLE)
+        assert "The first one." in out
+        assert "The newer one." not in out
+
+    def test_it_drops_the_heading_but_keeps_the_ones_inside(self):
+        out = self.notes_for("0.1.0", self.SAMPLE)
+        assert not out.startswith("## [")
+        assert "### A heading inside it" in out
+
+    def test_the_newest_section_runs_to_the_end(self):
+        assert "The newer one." in self.notes_for("0.2.0", self.SAMPLE)
+
+    def test_a_missing_version_is_refused_rather_than_guessed(self):
+        with pytest.raises(SystemExit):
+            self.notes_for("9.9.9", self.SAMPLE)
+
+    def test_the_real_changelog_produces_real_notes(self):
+        # The one that matters: the file as it actually is, for the version
+        # that is actually declared.
+        declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        version = declared["project"]["version"]
+        out = self.notes_for(version, (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+        assert len(out) > 200, "the release notes came back nearly empty"
+
+    def test_the_workflow_calls_it_rather_than_inlining_python(self):
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        assert "tools/release_notes.py" in workflow
+        assert "<<'PY'" not in workflow, "an inline here-document is back in the workflow"
