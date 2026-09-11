@@ -16,6 +16,7 @@ from dataclasses import replace
 
 import pytest
 
+from ticket_ai_mcp.cli import main
 from ticket_ai_mcp.evals.baseline import Baseline, compare
 from ticket_ai_mcp.evals.calibration import (
     Label,
@@ -698,3 +699,110 @@ def test_results_and_labels_survive_u2028_too(tmp_path):
         encoding="utf-8",
     )
     assert len(load_labels(labels)) == 1
+
+
+# ------------------------------------------------- the command CI actually runs
+
+
+def _tiny_suite(tmp_path, *, alignment=0.80):
+    """A dataset and a results file for it, with no model anywhere near."""
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
+    _write_board(dataset)
+    runs = tmp_path / "runs.jsonl"
+    write_runs(runs, [replace(_run(), alignment=alignment)])
+    return dataset, runs
+
+
+def test_eval_scores_a_results_file_without_a_model(tmp_path, capsys):
+    dataset, runs = _tiny_suite(tmp_path)
+    code = main(["eval", "--dataset", str(dataset), "--runs", str(runs)])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "acme" in out
+    assert "total" in out
+
+
+def test_eval_writes_a_baseline_and_then_holds_itself_to_it(tmp_path, capsys):
+    dataset, runs = _tiny_suite(tmp_path, alignment=0.90)
+    baseline = tmp_path / "baseline.json"
+
+    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs),
+                 "--baseline", str(baseline), "--update-baseline"]) == 0
+    capsys.readouterr()
+
+    # Same numbers, so the gate passes.
+    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs),
+                 "--baseline", str(baseline)]) == 0
+    assert "PASS" in capsys.readouterr().out
+
+    # A real drop, so it does not. This is the exit code CI fails on.
+    worse = tmp_path / "worse.jsonl"
+    write_runs(worse, [replace(_run(), alignment=0.50)])
+    assert main(["eval", "--dataset", str(dataset), "--runs", str(worse),
+                 "--baseline", str(baseline)]) == 1
+    assert "FAIL" in capsys.readouterr().out
+
+
+def test_eval_markdown_is_a_table(tmp_path, capsys):
+    dataset, runs = _tiny_suite(tmp_path)
+    main(["eval", "--dataset", str(dataset), "--runs", str(runs), "--markdown"])
+    assert "| board |" in capsys.readouterr().out
+
+
+def test_eval_without_a_model_says_so_rather_than_crashing(tmp_path, capsys, monkeypatch):
+    for var in ("TICKET_AI_WRITER", "TICKET_AI_MODEL", "TICKET_AI_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    dataset, _ = _tiny_suite(tmp_path)
+    assert main(["eval", "--dataset", str(dataset)]) == 2
+    assert "No model configured" in capsys.readouterr().err
+
+
+def test_eval_judge_without_labels_prints_uncalibrated_every_time(tmp_path, capsys, monkeypatch):
+    dataset, runs = _tiny_suite(tmp_path)
+    monkeypatch.setattr(
+        "ticket_ai_mcp.cli.writer_for",
+        lambda *a, **k: FixedWriter('{"verdict": "on_topic", "why": "yes"}'),
+    )
+    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs), "--judge"]) == 0
+    out = capsys.readouterr().out
+    assert "1/1 on topic" in out
+    # The caveat travels with the number rather than being documented once.
+    assert "uncalibrated" in out
+
+
+def test_eval_judge_with_labels_prints_the_agreement_instead(tmp_path, capsys, monkeypatch):
+    dataset, runs = _tiny_suite(tmp_path)
+    labels = tmp_path / "labels.jsonl"
+    labels.write_text(
+        json.dumps({"board": "acme", "case": "#7", "repeat": 0, "verdict": "on_topic"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "ticket_ai_mcp.cli.writer_for",
+        lambda *a, **k: FixedWriter('{"verdict": "on_topic", "why": "yes"}'),
+    )
+    main(["eval", "--dataset", str(dataset), "--runs", str(runs),
+          "--judge", "--labels", str(labels)])
+    out = capsys.readouterr().out
+    assert "uncalibrated" not in out
+    assert "kappa" in out
+    assert "too few to quote" in out
+
+
+def test_the_report_shows_spread_timing_language_and_findings():
+    # The optional lines: they only appear when there is something to say, and
+    # a report that stayed silent about them would look clean by omission.
+    board = _board_with_sections("Summary")
+    runs = [
+        _run("#1", alignment=0.6, seconds=40.0, attempts=2, body="## Impact\nWenn der Nutzer "
+             "auf den Knopf klickt, dann bleibt die Anzeige auf dem alten Stand stehen und "
+             "wird nicht mehr aktualisiert.", findings=("no_labels",)),
+        replace(_run("#1", alignment=0.9, seconds=70.0), repeat=1),
+    ]
+    text = render(score([board], runs))
+    assert "same case" in text
+    assert "seconds" in text
+    assert "invented" in text and "Impact" in text
+    assert "wrong one" in text
+    assert "no_labels" in text
