@@ -1,0 +1,372 @@
+{
+  "project": "gitlab-org/gitlab-runner",
+  "tracker": "gitlab",
+  "built_at": "2026-09-11T16:55:52.589179+00:00",
+  "sample_size": 32,
+  "exemplar_keys": [
+    "#2226",
+    "#26583",
+    "#27669",
+    "#27775",
+    "#28102",
+    "#28814",
+    "#29552",
+    "#29972",
+    "#32750",
+    "#36290",
+    "#36931",
+    "#36934",
+    "#37238",
+    "#37403",
+    "#38287",
+    "#38717",
+    "#38747",
+    "#38861",
+    "#38909",
+    "#39234",
+    "#39331",
+    "#39338",
+    "#39342",
+    "#39357",
+    "#39361",
+    "#39379",
+    "#39380",
+    "#39383",
+    "#39388",
+    "#39389",
+    "#39390",
+    "#312"
+  ],
+  "sections": [
+    {
+      "heading": "Summary",
+      "key": "summary",
+      "count": 12,
+      "rate": 0.375,
+      "position": 0.08
+    },
+    {
+      "heading": "Steps to reproduce",
+      "key": "steps to reproduce",
+      "count": 10,
+      "rate": 0.312,
+      "position": 1.2
+    },
+    {
+      "heading": "Proposal",
+      "key": "proposal",
+      "count": 9,
+      "rate": 0.281,
+      "position": 1.67
+    },
+    {
+      "heading": "Possible fixes",
+      "key": "possible fixes",
+      "count": 9,
+      "rate": 0.281,
+      "position": 6.78
+    },
+    {
+      "heading": "Environment description",
+      "key": "environment description",
+      "count": 6,
+      "rate": 0.188,
+      "position": 4.83
+    },
+    {
+      "heading": "Relevant logs and/or screenshots",
+      "key": "relevant logs and or screenshots",
+      "count": 6,
+      "rate": 0.188,
+      "position": 4.5
+    },
+    {
+      "heading": "Description",
+      "key": "description",
+      "count": 5,
+      "rate": 0.156,
+      "position": 0.2
+    },
+    {
+      "heading": "Context",
+      "key": "context",
+      "count": 5,
+      "rate": 0.156,
+      "position": 0.0
+    },
+    {
+      "heading": "Links to related issues and merge requests / references",
+      "key": "links to related issues and merge requests references",
+      "count": 4,
+      "rate": 0.125,
+      "position": 3.0
+    },
+    {
+      "heading": "Overview",
+      "key": "overview",
+      "count": 4,
+      "rate": 0.125,
+      "position": 0.25
+    },
+    {
+      "heading": "Actual behavior",
+      "key": "actual behavior",
+      "count": 4,
+      "rate": 0.125,
+      "position": 1.75
+    },
+    {
+      "heading": "Expected behavior",
+      "key": "expected behavior",
+      "count": 4,
+      "rate": 0.125,
+      "position": 3.0
+    },
+    {
+      "heading": "What is the current *bug* behavior?",
+      "key": "what is the current bug behavior",
+      "count": 4,
+      "rate": 0.125,
+      "position": 3.25
+    },
+    {
+      "heading": "What is the expected *correct* behavior?",
+      "key": "what is the expected correct behavior",
+      "count": 4,
+      "rate": 0.125,
+      "position": 4.25
+    },
+    {
+      "heading": "Tasks",
+      "key": "tasks",
+      "count": 4,
+      "rate": 0.125,
+      "position": 1.0
+    },
+    {
+      "heading": "References",
+      "key": "references",
+      "count": 4,
+      "rate": 0.125,
+      "position": 2.0
+    },
+    {
+      "heading": "Used GitLab Runner version",
+      "key": "used gitlab runner version",
+      "count": 3,
+      "rate": 0.094,
+      "position": 5.0
+    },
+    {
+      "heading": "Results of GitLab environment info",
+      "key": "results of gitlab environment info",
+      "count": 3,
+      "rate": 0.094,
+      "position": 6.67
+    },
+    {
+      "heading": "Example Project",
+      "key": "example project",
+      "count": 2,
+      "rate": 0.062,
+      "position": 3.0
+    },
+    {
+      "heading": "Output of checks",
+      "key": "output of checks",
+      "count": 2,
+      "rate": 0.062,
+      "position": 7.0
+    },
+    {
+      "heading": "Results of GitLab application Check",
+      "key": "results of gitlab application check",
+      "count": 2,
+      "rate": 0.062,
+      "position": 9.0
+    },
+    {
+      "heading": "Proposed fix",
+      "key": "proposed fix",
+      "count": 2,
+      "rate": 0.062,
+      "position": 1.0
+    }
+  ],
+  "conditionals": [
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 10,
+      "of": 10,
+      "rate": 1.0,
+      "baseline": 0.375
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "summary",
+      "then_heading": "Summary",
+      "count": 9,
+      "of": 9,
+      "rate": 1.0,
+      "baseline": 0.375
+    },
+    {
+      "when": "possible fixes",
+      "when_heading": "Possible fixes",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 8,
+      "of": 9,
+      "rate": 0.889,
+      "baseline": 0.312
+    },
+    {
+      "when": "summary",
+      "when_heading": "Summary",
+      "then": "steps to reproduce",
+      "then_heading": "Steps to reproduce",
+      "count": 10,
+      "of": 12,
+      "rate": 0.833,
+      "baseline": 0.312
+    },
+    {
+      "when": "steps to reproduce",
+      "when_heading": "Steps to reproduce",
+      "then": "possible fixes",
+      "then_heading": "Possible fixes",
+      "count": 8,
+      "of": 10,
+      "rate": 0.8,
+      "baseline": 0.281
+    },
+    {
+      "when": "summary",
+      "when_heading": "Summary",
+      "then": "possible fixes",
+      "then_heading": "Possible fixes",
+      "count": 9,
+      "of": 12,
+      "rate": 0.75,
+      "baseline": 0.281
+    }
+  ],
+  "discriminative": {},
+  "chars_median": 1014.5,
+  "chars_p25": 686.0,
+  "chars_p75": 1633.0,
+  "title_words_median": 8.0,
+  "title_prefixes": [
+    [
+      "gitlab-",
+      0.094
+    ],
+    [
+      "clear-",
+      0.031
+    ],
+    [
+      "Docs:",
+      0.031
+    ]
+  ],
+  "label_rate": 0.969,
+  "labels_per_ticket_median": 10.0,
+  "common_labels": [
+    [
+      "devops::verify",
+      0.938
+    ],
+    [
+      "section::ci",
+      0.938
+    ],
+    [
+      "group::runner core",
+      0.906
+    ],
+    [
+      "Category:Runner Core  [DEPRECATED]",
+      0.688
+    ],
+    [
+      "automation:ml",
+      0.531
+    ],
+    [
+      "workflow::complete",
+      0.5
+    ],
+    [
+      "type::feature",
+      0.344
+    ],
+    [
+      "type::bug",
+      0.344
+    ],
+    [
+      "backend",
+      0.281
+    ],
+    [
+      "runner::core",
+      0.25
+    ],
+    [
+      "type::maintenance",
+      0.188
+    ],
+    [
+      "Customer Interest",
+      0.188
+    ]
+  ],
+  "label_groups": [
+    "Premium",
+    "Runner",
+    "SLO",
+    "SME",
+    "backlog",
+    "bug",
+    "candidate",
+    "devops",
+    "executor",
+    "feature",
+    "group",
+    "maintenance",
+    "priority",
+    "runner",
+    "section",
+    "security-backlog",
+    "severity",
+    "support_backlog",
+    "type",
+    "workflow"
+  ],
+  "list_rate": 0.688,
+  "checkbox_rate": 0.188,
+  "code_rate": 0.469,
+  "image_rate": 0.125,
+  "link_rate": 0.719,
+  "cross_ref_rate": 0.156,
+  "assignee_rate": 0.469,
+  "language": "en",
+  "note_codes": [
+    [
+      "tracker_withheld",
+      {
+        "host": "https://gitlab.com",
+        "parts": [
+          "notes",
+          "resource_state_events"
+        ],
+        "why": "anonymous"
+      }
+    ]
+  ]
+}

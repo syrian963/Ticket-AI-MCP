@@ -11,7 +11,7 @@ evaluation.
 
 ## The dataset had to stop moving
 
-121 cases over nine public boards, each stored next to **the board profile as it
+134 cases over ten public boards, each stored next to **the board profile as it
 stood when the case was collected**.
 
 Freezing the profile is not tidiness. `compose` writes into whatever shape the
@@ -30,6 +30,7 @@ wrong thing while looking exactly like a comparison.
 | hibernate | 10 | **Jira** | English | **prose** | 4 |
 | veloren | 10 | GitLab | English | **prose** | 5 |
 | cassandra | 12 | **Jira** | English | **prose** | 8 |
+| gitlab-runner | 13 | GitLab | English | 3 | 22 |
 
 Two columns, because they are two different things. **Skeleton** is what the
 prompt asks for: the sections common enough to be worth naming. **Sections
@@ -152,38 +153,60 @@ than a result.
 **No labels yet**, so the judge cannot be calibrated and its output is exactly
 the opinion the `uncalibrated` line says it is.
 
-**One assertion cannot fire on its own, and chasing it turned up something
-better.** The guard wants a board without a skeleton and a board with one. It
-cannot fire independently because all three Jira boards write prose, so removing
-every prose board removes every Jira board and the tracker assertion goes first.
+**One assertion cannot fire on its own.** The guard wants a board without a
+skeleton and a board with one. It cannot fire independently because every Jira
+board here writes prose, so removing all the prose boards removes both trackers
+and the tracker assertion goes first.
 
-The reason is not that Jira users write worse tickets. Every Jira board here has
-a section vocabulary. **None of it is a convention**, and the numbers are not
-close:
+### Two claims this page made and had to withdraw
 
-| Board | Tracker | Highest section rate |
-|---|---|---|
-| inkscape | GitLab | 96%, 96%, 92%, 81%, 77% |
-| veloren | GitLab | 20%, 20%, 20%, 20%, 20% |
-| kafka | Jira | 13%, 10%, 6%, 6%, 6% |
-| hibernate | Jira | 9%, 6%, 6%, 6% |
-| cassandra | Jira | 6%, 6%, 6%, 6%, 6% |
+Chasing that, an earlier version said the 0.6 skeleton threshold is never a
+close call, and that the two shapes are two shapes rather than two ends of a
+slider. The evidence was the boards already in the dataset, which is a sample
+chosen by whoever made the claim.
 
-CASSANDRA has `Environment`, `Reproduction`, `Result`, `Tests`, `Summary`, `Root
-cause` and `Steps to reproduce` in its vocabulary. Not one of them reaches seven
-percent.
+Probing boards that are **not** in it refuted the first in the first row:
+`gitlab-org/gitlab-runner` reads 68% on a 60-ticket sample and 53% on a
+40-ticket one, which is the same board on both sides of the threshold depending
+on how much history was looked at.
 
-**The skeleton threshold is 0.6, and across nine boards nothing lands near it.**
-Every board is either far above or far below, which says the default is not a
-knob anyone has to tune and that the two shapes are genuinely two shapes rather
-than two ends of a slider. GitLab issue templates are committed files that
-pre-fill the box; a Jira description starts empty, and a team that agrees on a
-shape in a wiki page gets six percent adoption.
+The second was worse, and collecting gitlab-runner properly is what exposed it.
+**The top board-wide rate is not what decides the shape.** `Profile.skeleton`
+has two paths, and on most boards here the second one does all the work:
 
-This is also the case for measuring invented headings against every observed
-section rather than the skeleton. On CASSANDRA a draft that writes `Root cause`
-is using the board's own vocabulary, and the prompt never mentioned it because
-nothing there is common enough to name.
+| Board | Skeleton | via rate ≥ 60% | via a pair | Strongest pair |
+|---|---|---|---|---|
+| gitlab-cli | 6 | 0 | **6** | current bug behavior → expected correct behavior, 12/12 |
+| inkscape | 5 | **5** | 0 | — |
+| fdroid | 3 | 0 | **3** | what did you expect → what did you see instead, 18/19 |
+| fitko-fim | 3 | 1 | **2** | Relevante Informationen → Warum machen wir das?, 18/18 |
+| gitlab-runner | 3 | 0 | **3** | Steps to reproduce → Summary, 10/10 |
+| kern-ux | 2 | 0 | **2** | Beschreibung → Akzeptanzkriterien, 8/9 |
+| veloren, kafka, hibernate, cassandra | 0 | 0 | 0 | — |
+
+**Only inkscape earns its skeleton the way this page assumed every board did.**
+kern-ux has no section above 39% and still has a skeleton, because two headings
+appear together on eight of the nine tickets that have either.
+
+The mechanism is obvious in hindsight and the docstring of `skeleton` says it
+outright, having been written after a real board proved the point. A board's
+tickets are not all bug reports. Features and chores dilute a bug form's
+sections board-wide, so the rate understates the template — but among the
+tickets that use one half of a pair, the other half is nearly always there.
+12/12, 18/19, 18/18, 10/10, 8/9.
+
+So the earlier table of "top section rates" was measuring one input and
+reporting it as the decision. What it does still show is the Jira half, and
+there the two paths agree: seven Jira boards measured — kafka, hibernate,
+cassandra, LUCENE, SERVER, MDEV, JBEAP — **not one has a section above 13% and
+not one has a pair that clears the floor either**. CASSANDRA carries
+`Environment`, `Reproduction`, `Result`, `Tests`, `Summary`, `Root cause` and
+`Steps to reproduce` in its vocabulary; none of them reaches seven percent and
+none of them implies another.
+
+That is also the case for measuring invented headings against every observed
+section rather than the skeleton. On CASSANDRA a draft writing `Root cause` is
+using the board's own vocabulary, and the prompt could not have named it.
 
 The guard stays: it costs nothing and becomes meaningful the day a Jira board
 with an enforced template joins. But this page should not claim it is being
