@@ -710,16 +710,25 @@ class TestAPathologicalCorpusCannotHangIt:
         """The number and the budget are both measured, not guessed.
 
         A/B against the same corpus: with the ceiling, 2000 recurring headings
-        cost 0.17 seconds; without it, 3.32. A second sits well above the one
+        cost 0.17 seconds; without it, 3.32. A second sat well above the one
         and well below the other.
 
         The first version of this test used a thousand headings and a
         two-second budget - and a thousand costs 0.94 seconds uncapped, so it
         passed with the ceiling and without it, and proved nothing.
+
+        **The budget moved to two seconds because the original was measured
+        without coverage and CI runs with it.** Six runs under
+        `--cov=ticket_ai_mcp` came in at 0.57, 0.60, 0.61, 0.61, 0.67 and 0.97
+        seconds, so the old budget had one run at 97% of it and this failed
+        once in a full suite. Two seconds keeps the gap to the uncapped 3.32
+        that the test exists to catch, and stops it firing on a loaded runner.
+        A timing test that goes red for being unlucky teaches people to rerun
+        CI, which is the opposite of what it is for.
         """
         started = time.monotonic()
         build(self.corpus(2000), project="acme/shop", tracker="gitlab")
-        assert time.monotonic() - started < 1.0
+        assert time.monotonic() - started < 2.0
 
     def test_the_cap_is_far_above_any_real_board(self):
         # Measured across the fleet: the widest board produced eleven triggers
