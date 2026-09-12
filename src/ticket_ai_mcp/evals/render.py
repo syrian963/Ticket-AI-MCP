@@ -66,7 +66,9 @@ def _board_lines(board: BoardReport) -> list[str]:
             f"(worst ±{board.per_case_stdev.high:.3f})"
         )
     if board.seconds is not None:
-        lines.append(f"    seconds      {board.seconds.median:.0f} median, {board.seconds.high:.0f} worst")
+        lines.append(
+            f"    seconds      {board.seconds.median:.0f} median, {board.seconds.high:.0f} worst"
+        )
     lines.append(f"    revised      {_pct(board.revised)} needed the second pass")
     lines.append(f"    invented     {_pct(board.invented_rate)} of drafts added a heading")
     if board.invented_headings:
@@ -221,10 +223,14 @@ def render_html(report: Report, verdict: Verdict | None = None, *, title: str = 
         state = "pass" if verdict.ok else "fail"
         body.append(f'<p class="{state}"><strong>{state.upper()}</strong></p>')
         if verdict.complaints:
-            body.append("<ul>" + "".join(f"<li>{_esc(c)}</li>" for c in verdict.complaints) + "</ul>")
+            body.append(
+                "<ul>" + "".join(f"<li>{_esc(c)}</li>" for c in verdict.complaints) + "</ul>"
+            )
         if verdict.notes:
             body.append(
-                '<ul class="note">' + "".join(f"<li>{_esc(n)}</li>" for n in verdict.notes) + "</ul>"
+                '<ul class="note">'
+                + "".join(f"<li>{_esc(n)}</li>" for n in verdict.notes)
+                + "</ul>"
             )
 
     if report.findings:
@@ -233,7 +239,7 @@ def render_html(report: Report, verdict: Verdict | None = None, *, title: str = 
         body.append("</ul>")
 
     return (
-        "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{_esc(title)}</title><style>{HTML_STYLE}</style></head><body>"
         + "".join(body)

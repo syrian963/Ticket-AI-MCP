@@ -83,7 +83,12 @@ class Agreement:
         """
         if self.kappa is None:
             return "undefined"
-        for floor, name in ((0.81, "almost perfect"), (0.61, "substantial"), (0.41, "moderate"), (0.21, "fair")):
+        for floor, name in (
+            (0.81, "almost perfect"),
+            (0.61, "substantial"),
+            (0.41, "moderate"),
+            (0.21, "fair"),
+        ):
             if self.kappa >= floor:
                 return name
         return "poor" if self.kappa >= 0 else "worse than chance"
@@ -117,7 +122,9 @@ def agreement(labels: list[Label], verdicts) -> Agreement:
     the two counts are how that becomes visible.
     """
     judged = {
-        (v.board, v.case, v.repeat): v.verdict for v in verdicts if getattr(v, "ok", True) and v.verdict
+        (v.board, v.case, v.repeat): v.verdict
+        for v in verdicts
+        if getattr(v, "ok", True) and v.verdict
     }
     by_label = {label.ident: label.verdict for label in labels}
 
@@ -153,7 +160,9 @@ def render_agreement(result: Agreement) -> str:
             f"{result.judged_only} judged but not labelled"
         )
     lines.append("  human -> judge")
-    lines.extend(f"    {human:10s} {machine:10s} {count}" for human, machine, count in result.confusion)
+    lines.extend(
+        f"    {human:10s} {machine:10s} {count}" for human, machine, count in result.confusion
+    )
     if result.pairs < 30:
         lines.append(f"  note: {result.pairs} pairs is too few to quote this figure anywhere")
     return "\n".join(lines)

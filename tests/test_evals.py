@@ -346,9 +346,7 @@ def test_invented_is_measured_against_every_section_not_the_skeleton():
 
     board = _board_with_sections("Summary")
     rare = Section(heading="Workaround", key="workaround", count=3, rate=0.3, position=2)
-    board = replace(
-        board, profile=replace(board.profile, sections=(*board.profile.sections, rare))
-    )
+    board = replace(board, profile=replace(board.profile, sections=(*board.profile.sections, rare)))
     assert [h for h, _ in board.profile.skeleton()] == ["Summary"]
     assert invented_sections("## Workaround\ndo this", board) == ()
 
@@ -423,9 +421,7 @@ def test_runs_for_an_unknown_board_are_dropped_not_miscounted():
 # -------------------------------------------------------------------- baseline
 
 
-def _report(
-    alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0, runs=10, checks=5
-):
+def _report(alignment=0.80, boards=(("acme", 0.80),), model="fixed-1", failed=0, runs=10, checks=5):
     from ticket_ai_mcp.evals.metrics import BoardReport, Report
 
     return Report(
@@ -539,7 +535,9 @@ def test_the_report_prints_the_spread_next_to_the_mean():
 def test_one_observation_says_so_instead_of_claiming_zero_spread():
     from ticket_ai_mcp.evals.metrics import Report
 
-    single = Report(model="m", boards=(), runs=1, failed=0, alignment=Spread.of([0.8]), pooled=0.8, checks=5)
+    single = Report(
+        model="m", boards=(), runs=1, failed=0, alignment=Spread.of([0.8]), pooled=0.8, checks=5
+    )
     assert "n=1" in render(single)
     assert "±0.000" not in render(single)
 
@@ -579,7 +577,9 @@ def test_markdown_carries_the_verdict():
 
 
 def test_a_verdict_is_pulled_out_of_surrounding_prose():
-    answer = 'Sure!\n```json\n{"verdict": "partly", "why": "mentions it once"}\n```\nHope that helps'
+    answer = (
+        'Sure!\n```json\n{"verdict": "partly", "why": "mentions it once"}\n```\nHope that helps'
+    )
     assert parse(answer) == ("partly", "mentions it once")
 
 
@@ -737,20 +737,37 @@ def test_eval_writes_a_baseline_and_then_holds_itself_to_it(tmp_path, capsys):
     dataset, runs = _tiny_suite(tmp_path, alignment=0.90)
     baseline = tmp_path / "baseline.json"
 
-    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs),
-                 "--baseline", str(baseline), "--update-baseline"]) == 0
+    assert (
+        main(
+            [
+                "eval",
+                "--dataset",
+                str(dataset),
+                "--runs",
+                str(runs),
+                "--baseline",
+                str(baseline),
+                "--update-baseline",
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
 
     # Same numbers, so the gate passes.
-    assert main(["eval", "--dataset", str(dataset), "--runs", str(runs),
-                 "--baseline", str(baseline)]) == 0
+    assert (
+        main(["eval", "--dataset", str(dataset), "--runs", str(runs), "--baseline", str(baseline)])
+        == 0
+    )
     assert "PASS" in capsys.readouterr().out
 
     # A real drop, so it does not. This is the exit code CI fails on.
     worse = tmp_path / "worse.jsonl"
     write_runs(worse, [replace(_run(), alignment=0.50)])
-    assert main(["eval", "--dataset", str(dataset), "--runs", str(worse),
-                 "--baseline", str(baseline)]) == 1
+    assert (
+        main(["eval", "--dataset", str(dataset), "--runs", str(worse), "--baseline", str(baseline)])
+        == 1
+    )
     assert "FAIL" in capsys.readouterr().out
 
 
@@ -792,8 +809,9 @@ def test_eval_judge_with_labels_prints_the_agreement_instead(tmp_path, capsys, m
         "ticket_ai_mcp.cli.writer_for",
         lambda *a, **k: FixedWriter('{"verdict": "on_topic", "why": "yes"}'),
     )
-    main(["eval", "--dataset", str(dataset), "--runs", str(runs),
-          "--judge", "--labels", str(labels)])
+    main(
+        ["eval", "--dataset", str(dataset), "--runs", str(runs), "--judge", "--labels", str(labels)]
+    )
     out = capsys.readouterr().out
     assert "uncalibrated" not in out
     assert "kappa" in out
@@ -805,9 +823,16 @@ def test_the_report_shows_spread_timing_language_and_findings():
     # a report that stayed silent about them would look clean by omission.
     board = _board_with_sections("Summary")
     runs = [
-        _run("#1", alignment=0.6, seconds=40.0, attempts=2, body="## Impact\nWenn der Nutzer "
-             "auf den Knopf klickt, dann bleibt die Anzeige auf dem alten Stand stehen und "
-             "wird nicht mehr aktualisiert.", findings=("no_labels",)),
+        _run(
+            "#1",
+            alignment=0.6,
+            seconds=40.0,
+            attempts=2,
+            body="## Impact\nWenn der Nutzer "
+            "auf den Knopf klickt, dann bleibt die Anzeige auf dem alten Stand stehen und "
+            "wird nicht mehr aktualisiert.",
+            findings=("no_labels",),
+        ),
         replace(_run("#1", alignment=0.9, seconds=70.0), repeat=1),
     ]
     text = render(score([board], runs))
@@ -861,9 +886,7 @@ def test_a_missing_default_dataset_explains_that_it_is_not_in_the_wheel(monkeypa
     # The likeliest way to see this is `ticket-ai eval` from an installed
     # package. "does not exist" about a path inside site-packages sends people
     # hunting for a broken install.
-    monkeypatch.setattr(
-        "ticket_ai_mcp.evals.dataset.DATASET_DIR", tmp_path / "not-here"
-    )
+    monkeypatch.setattr("ticket_ai_mcp.evals.dataset.DATASET_DIR", tmp_path / "not-here")
     with pytest.raises(DatasetError, match="not part of the installed package"):
         load_suite()
 
@@ -982,9 +1005,7 @@ def test_coverage_counts_the_skeleton_not_the_whole_vocabulary():
 
     board = _board_with_sections("Summary")
     rare = Section(heading="Workaround", key="workaround", count=3, rate=0.3, position=2)
-    board = replace(
-        board, profile=replace(board.profile, sections=(*board.profile.sections, rare))
-    )
+    board = replace(board, profile=replace(board.profile, sections=(*board.profile.sections, rare)))
     assert [h for h, _ in board.profile.skeleton()] == ["Summary"]
     assert skeleton_coverage("## Workaround\nx", board) == 0.0
     assert invented_sections("## Workaround\nx", board) == ()
