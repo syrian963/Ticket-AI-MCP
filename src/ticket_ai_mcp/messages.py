@@ -87,6 +87,24 @@ _MESSAGES: dict[str, dict[str, dict[str, str]]] = {
             "fix": "Die Überschrift {heading!r} ergänzen und ausfüllen.",
         },
     },
+    "missing_promised_section": {
+        "en": {
+            "what": "The {heading!r} section was asked for and is not there.",
+            "why": (
+                "This draft was handed the board's skeleton before it was written, "
+                "and {heading!r} was on it."
+            ),
+            "fix": "Add the {heading!r} section.",
+        },
+        "de": {
+            "what": "Der Abschnitt {heading!r} war vorgegeben und fehlt.",
+            "why": (
+                "Diesem Entwurf wurde das Skelett des Boards vor dem Schreiben "
+                "übergeben, und {heading!r} stand darauf."
+            ),
+            "fix": "Abschnitt {heading!r} ergänzen.",
+        },
+    },
     "missing_conditional_section": {
         "en": {
             "what": "Has a {when!r} section but no {then!r}.",
