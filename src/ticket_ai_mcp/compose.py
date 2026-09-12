@@ -220,14 +220,19 @@ def compose(
     language = {"de": "German", "en": "English"}.get(profile.language or "", "English")
     system = SYSTEM.format(language=language, target=round(profile.chars_median) or 800)
 
+    # The headings the prompt actually handed over. They are checked
+    # unconditionally, because a draft that was given the skeleton and wrote
+    # none of it is failing rather than writing a different shape of ticket.
+    promised = tuple(heading for heading, _ in profile.skeleton())
+
     body = _drop_repeated_title(title, writer.write(system, build_prompt(title, profile, context)))
-    review = _review_draft(title, body, profile, labels=labels)
+    review = _review_draft(title, body, profile, labels=labels, promised=promised)
     attempts = 1
 
     while attempts <= revisions and review.findings:
         revised = _drop_repeated_title(title, writer.write(system, _revision_prompt(body, review)))
         attempts += 1
-        candidate = _review_draft(title, revised, profile, labels=labels)
+        candidate = _review_draft(title, revised, profile, labels=labels, promised=promised)
         # Keep the better of the two. A revision that scores worse is a
         # revision that misunderstood, and shipping it because it came second
         # would make the loop actively harmful.

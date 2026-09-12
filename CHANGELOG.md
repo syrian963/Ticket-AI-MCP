@@ -41,6 +41,19 @@ trackers, and boards with a section skeleton as well as boards that write pure
 prose. CI asserts all three survive, because losing one would stop measuring it
 without the average moving.
 
+### Changed
+
+- **A draft is now held to the skeleton it was handed.** `review_draft` takes
+  `promised` and `compose` passes the board's skeleton; those headings are
+  checked unconditionally. The conditional rules stay gated for existing
+  tickets, where they belong: a feature ticket must not be marked down for
+  lacking the bug form's reproduction steps. But a draft that was given the
+  skeleton and wrote none of it was failing, and the gate hid that — writing
+  two of six headings scored *below* writing none, because the two switched on
+  rules that then failed for the other four. Writing more of the skeleton now
+  raises the score at every step, and the number of applicable checks no longer
+  moves with what the draft chose to write.
+
 ### Fixed
 
 - **`str.splitlines` is wrong for JSONL.** It breaks on U+2028, U+2029, U+0085

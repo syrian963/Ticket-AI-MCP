@@ -127,32 +127,19 @@ board. The gate compares across ten, so it uses the pooled figure, and every
 board line prints its check count next to its score: 1.000 over two checks and
 1.000 over nine are not the same claim, and only that line says so.
 
-## What the harness found: alignment can be raised by writing less
+## What the harness found, and what it turned out to be
 
 Two figures per board, neither needing a model. **stub** is a fixed English
 paragraph with no headings, put through `compose`. **human** is what the board's
 own shipped tickets score against the board's own profile.
 
-| Board | Checks | Stub | Human | Gap |
-|---|---|---|---|---|
-| inkscape | 9 | 0.381 | 0.945 | +0.564 |
-| kafka | 2 | 0.500 | 0.786 | +0.286 |
-| fitko-fim | 5 | 0.554 | 0.828 | +0.274 |
-| kern-ux | 3 | 0.549 | 0.761 | +0.212 |
-| fdroid | 3 | 0.800 | 0.902 | +0.101 |
-| gitlab-runner | 7 | 0.923 | 0.886 | **−0.037** |
-| gitlab-cli | 5 | 0.963 | 0.887 | **−0.075** |
-| cassandra | 2 | 1.000 | 0.875 | **−0.125** |
-| hibernate | 2 | 1.000 | 0.850 | **−0.150** |
-| veloren | 2 | 1.000 | 0.700 | **−0.300** |
-
-**On five boards of ten, meaningless text outscores the people whose board it
-is.** Not only on the two-check boards: gitlab-cli runs five checks and
+On five boards of ten the stub outscored the people whose board it is, and not
+only on the boards that check almost nothing: gitlab-cli ran five checks and
 gitlab-runner seven.
 
-### The mechanism, on gitlab-cli
+### The mechanism
 
-Same title, same profile, three drafts:
+Same title, same profile on gitlab-cli, three drafts:
 
 | Draft | Checks that applied | Alignment |
 |---|---|---|
@@ -160,70 +147,90 @@ Same title, same profile, three drafts:
 | one skeleton heading | 5 | **1.000** |
 | two skeleton headings | 10 | **0.600** |
 
-Writing more of what the board asks for makes the score go **down**.
+Writing more of what the board asks for made the score go **down**. `alignment`
+is the share of *applicable* checks a draft passed, and a draft decided which
+checks applied to it. Most of that board's skeleton comes from conditional
+pairs, and a conditional only becomes applicable once one half of the pair is
+present. Write neither half and the rule never fires.
 
-`alignment` is the share of *applicable* checks a draft passed, and a draft
-decides which checks apply to it. Most of gitlab-cli's skeleton comes from
-conditional pairs, and a conditional only becomes applicable once one half of
-the pair is present. Write neither half and the rule never fires; write one and
-it fires against you.
+### It was not a bug in `review`
 
-This is not a fault in the harness. It is `review_draft` being measured against
-something it had not been measured against before, and it is the reason the
-report prints **checks** and **human** on every board line. A score without its
-denominator, next to what people on that board actually achieve, is not a
-score.
+The first write-up of this page called it a defect in the scorer. That was too
+strong, and reading `review` rather than only its output is what corrected it.
 
-### What follows
+**The conditional gating is right for the job `review` was written for.** A
+board has more than one shape of ticket, and a feature ticket must not be
+marked down for lacking the bug form's reproduction steps. The gate is what
+makes a board with two shapes checkable at all, and the docstring says so.
 
-**The reference point is the human figure, not 1.0.** A model at 0.85 on
-inkscape is at the level of that board's own tickets; the same 0.85 on
-hibernate is below a stub.
+**The same function was serving two contracts.** For a ticket somebody wrote,
+the question is *which shape is this, and is it complete for that shape*. For a
+draft this tool commissioned **against a skeleton it handed over itself**, the
+question is *did you write what you were asked for*, and there the gate hides
+exactly the failure it exists to catch.
 
-**The human ceiling is not 1.0 anywhere**, ranging from 0.700 to 0.945. Most of
-the gap is `short_description`, which fires below the corpus's 25th percentile,
-and a quarter of any corpus sits below its own 25th percentile by construction.
+### The fix, and what it cost
 
-**Whether `alignment` should be redefined is not the harness's decision.** It
-is the tool's central number, quoted in the README and returned by the MCP
-server, and changing it changes every claim built on it. The harness's job was
-to make the property visible, and it is now on every report.
+`review_draft` now takes `promised`, the headings the prompt actually handed
+over, and `compose` passes the skeleton. Those are checked unconditionally.
+Sections already covered by the board-wide rule are skipped, and a conditional
+pointing at a promised heading is skipped too, or one missing section would be
+two failed checks.
 
-**What the harness could do is add a figure omission cannot game.** Coverage is
-the share of the skeleton a draft actually wrote. The denominator is what the
-prompt handed over, so writing nothing scores zero and there is no way up
-except doing the work.
+The same board, writing more of its skeleton:
 
-| Board | Stub | Human | Coverage: stub | Coverage: human |
-|---|---|---|---|---|
-| inkscape | 0.381 | 0.945 | 0.000 | 0.958 |
-| fdroid | 0.800 | 0.902 | 0.000 | 0.767 |
-| fitko-fim | 0.554 | 0.828 | 0.000 | 0.590 |
-| gitlab-cli | **0.963** | 0.887 | 0.000 | 0.406 |
-| gitlab-runner | **0.923** | 0.886 | 0.000 | 0.256 |
-| kern-ux | 0.549 | 0.761 | 0.000 | 0.353 |
-| cassandra, hibernate, kafka, veloren | — | — | *no skeleton* | *no skeleton* |
+| Skeleton sections written | Checks | Alignment |
+|---|---|---|
+| 0 of 6 | 11 | 0.455 |
+| 1 | 11 | 0.545 |
+| 2 | 11 | 0.636 |
+| 3 | 11 | 0.727 |
+| 4 | 11 | 0.818 |
+| 5 | 11 | 0.909 |
+| 6 of 6 | 11 | **1.000** |
 
-**Both boards where alignment inverted are separated correctly by coverage**,
-by 0.406 and 0.256. On every sectioned board the stub scores zero and the
-board's own tickets do not.
+Monotonic, and the denominator holds still: a draft can no longer change how
+many checks apply to it.
 
-Note how far the human numbers are from 1.0. On gitlab-runner the board's own
-tickets contain a quarter of their own skeleton, which is a fact about the
-skeleton: it comes from conditional pairs there, not from sections most
-tickets carry.
+Stub against the boards' own tickets, before and after:
 
-### The three boards nothing structural can decide
+| Board | Skeleton | Before | After |
+|---|---|---|---|
+| gitlab-cli | 6 | **−0.075** | **+0.449** |
+| gitlab-runner | 3 | **−0.037** | **+0.240** |
+| fdroid | 3 | +0.101 | +0.502 |
+| kern-ux | 2 | +0.212 | +0.431 |
+| fitko-fim | 3 | +0.274 | +0.432 |
+| inkscape | 5 | +0.564 | +0.564 |
+| cassandra, hibernate, veloren | 0 | negative | **unchanged, and correct** |
 
-`cassandra`, `hibernate`, `kafka` and `veloren` have no skeleton, so there is
-nothing to cover, and a stub that writes prose with no headings is **doing
-exactly what the prompt told it to**. Structure cannot separate it from a real
-ticket, and it should not try.
+inkscape does not move, which is the check on the change rather than a
+disappointment: its skeleton comes from board-wide rates, which were already
+unconditional, so nothing was double counted.
 
-What separates them is whether the text is about the title, and that is the one
-question the judge is asked. So the judge is not a refinement on these boards.
-**It is the only signal there is**, which is also why its calibration is the
-thing still missing rather than a nicety.
+The pooled stub figure falls from 0.676 to 0.487 over 805 checks instead of
+580. The stub did not get worse. It is being asked the question it was
+avoiding.
+
+### The three boards that still invert, correctly
+
+`cassandra`, `hibernate` and `veloren` have no skeleton, so nothing was
+promised and nothing changed. A stub that writes prose with no headings is
+**doing exactly what the prompt told it to**, and structure cannot separate it
+from a real ticket there.
+
+What separates them is whether the text is about the title, which is the one
+question the judge is asked. On those boards the judge is not a refinement.
+**It is the only signal there is**, and that is the sharper reason its
+calibration is what is still missing.
+
+### One asymmetry to keep in mind
+
+The **human** column scores real tickets **without** `promised`, because nobody
+handed those writers a skeleton. The stub column scores with it. The two
+columns therefore answer slightly different questions, and the like-for-like
+pair is coverage: what share of the skeleton the draft wrote, against what
+share the board's own tickets contain.
 
 ## The gate tolerates noise on purpose
 

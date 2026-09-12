@@ -1125,19 +1125,33 @@ def test_the_stub_covers_none_of_any_skeleton():
     assert all(b.coverage.mean == 0.0 for b in sectioned)
 
 
-def test_the_stub_still_beats_real_tickets_somewhere():
-    # Pinning a documented defect, not an achievement. alignment is the share
-    # of *applicable* checks passed and a draft decides which apply, so a draft
-    # that writes nothing can outscore the board's own tickets. If this test
-    # starts failing, the defect is fixed and docs/evaluating-compose.md is
-    # stale.
-    _, report = _real_suite()
+def test_no_board_with_a_skeleton_lets_the_stub_win():
+    # This is what `promised` fixed. Before it, a draft decided which checks
+    # applied to it: gitlab-cli and gitlab-runner both scored the stub above
+    # their own real tickets, because writing no headings meant the
+    # conditional rules never fired.
+    boards, report = _real_suite()
+    skeletons = {b.slug: len(b.profile.skeleton()) for b in boards}
     inverted = [
         b.board
         for b in report.boards
-        if b.alignment and b.human and b.alignment.mean > b.human.mean
+        if skeletons.get(b.board) and b.alignment and b.human and b.alignment.mean > b.human.mean
     ]
-    assert inverted, "alignment no longer inverts anywhere - update the docs"
+    assert not inverted, f"a stub outscored real tickets on {inverted}"
+
+
+def test_a_prose_board_may_still_let_the_stub_win():
+    # Not a defect and not something to fix. A board with no skeleton asked
+    # for no headings, so a stub that writes prose without any is doing
+    # exactly what it was told. Structure cannot separate it from a real
+    # ticket there, and the judge is the only thing that can.
+    boards, report = _real_suite()
+    prose = {b.slug for b in boards if not b.profile.skeleton()}
+    assert prose, "the dataset has no prose board"
+    assert any(
+        b.board in prose and b.alignment and b.human and b.alignment.mean > b.human.mean
+        for b in report.boards
+    )
 
 
 def test_pooling_matters_on_this_dataset():
@@ -1146,3 +1160,33 @@ def test_pooling_matters_on_this_dataset():
     _, report = _real_suite()
     assert report.alignment is not None and report.pooled is not None
     assert report.pooled < report.alignment.mean
+
+
+def test_writing_more_of_the_skeleton_never_lowers_the_score():
+    # The property `promised` exists for, checked on a real board rather than
+    # a constructed one. Before the change this sequence read
+    # 1.000, 1.000, 0.600: writing more of what the board asked for made the
+    # score go down.
+    from ticket_ai_mcp.evals import load_suite as real_load_suite
+    from ticket_ai_mcp.review import review_draft
+
+    board = next(b for b in real_load_suite() if b.slug == "gitlab-cli")
+    case = board.cases[0]
+    headings = [h for h, _ in board.profile.skeleton()]
+    filler = "The label printing stops after ten positions. " * 20
+
+    scores = []
+    checks = set()
+    for n in range(len(headings) + 1):
+        body = "\n".join(f"## {h}\n{filler}" for h in headings[:n]) or filler
+        review = review_draft(
+            case.title, body, board.profile, labels=case.labels, promised=tuple(headings)
+        )
+        scores.append(review.alignment)
+        checks.add(review.checks_run)
+
+    assert scores == sorted(scores), scores
+    assert scores[0] < scores[-1]
+    # And the denominator holds still, which is the other half of the fix: a
+    # draft can no longer change how many checks apply to it.
+    assert len(checks) == 1, checks

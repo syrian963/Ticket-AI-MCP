@@ -147,6 +147,7 @@ def review_draft(
     profile: Profile,
     *,
     labels: tuple[str, ...] = (),
+    promised: tuple[str, ...] = (),
 ) -> Review:
     """Measure a ticket that has not been created yet.
 
@@ -176,11 +177,29 @@ def review_draft(
         tracker=profile.tracker,
         project=profile.project,
     )
-    return review(draft, profile)
+    return review(draft, profile, promised=promised)
 
 
-def review(ticket: Ticket, profile: Profile) -> Review:
-    """Compare one ticket with the profile built from the team's own tickets."""
+def review(ticket: Ticket, profile: Profile, *, promised: tuple[str, ...] = ()) -> Review:
+    """Compare one ticket with the profile built from the team's own tickets.
+
+    `promised` is the list of headings the writer was handed and asked to use,
+    and it is empty for every ticket that already exists. The difference is a
+    difference in the question being asked. For a ticket somebody wrote, the
+    question is *which shape is this and is it complete for that shape*, and a
+    feature ticket must not be marked down for lacking the bug form's
+    reproduction steps. For a draft this tool commissioned against a skeleton
+    it supplied itself, the question is *did you write what you were asked
+    for*, and a draft that wrote none of it is failing, not writing a
+    different kind of ticket.
+
+    Without this, the conditional rules hid exactly the failure they exist to
+    catch. They only apply once one half of a pair is present, so a draft with
+    no headings at all had them never fire: on gitlab-cli a draft with nothing
+    scored 1.000 over five checks and a draft with two of the six skeleton
+    headings scored 0.600 over ten. Writing more of what the board wanted
+    lowered the score.
+    """
     body = shape(ticket.description)
     findings: list[Finding] = []
     passed: list[tuple[str, dict[str, Any]]] = []
@@ -268,6 +287,30 @@ def review(ticket: Ticket, profile: Profile) -> Review:
             )
         )
 
+    # What the writer was told to produce. Unconditional on purpose: this is
+    # the one case where a missing section cannot be explained away as a
+    # different ticket shape, because the shape was handed over with the
+    # request. Sections already covered by the board-wide rule above are
+    # skipped so that one heading is never two checks.
+    checked_by_rate = {s.key for s in profile.sections if s.rate >= EXPECT_RATE}
+    promised_keys: set[str] = set()
+    for heading in promised:
+        key = normalise_heading(heading)
+        if key in checked_by_rate:
+            continue
+        promised_keys.add(key)
+        record("medium", key in present)
+        if key in present:
+            passed.append(("has_section", {"heading": heading}))
+        else:
+            findings.append(
+                Finding(
+                    code="missing_promised_section",
+                    severity="medium",
+                    params={"heading": heading},
+                )
+            )
+
     # A convention that only holds on some tickets is invisible in the
     # board-wide rate, so it is checked separately and only on the tickets it
     # applies to. This is what makes a team with two ticket shapes checkable at
@@ -279,6 +322,13 @@ def review(ticket: Ticket, profile: Profile) -> Review:
     missing: set[str] = set()
     for rule in profile.conditionals:
         if rule.when not in present or rule.rate < EXPECT_RATE:
+            continue
+        # Already checked above, unconditionally. Counting it here as well
+        # made one missing section two failed checks, so a draft that wrote
+        # two of six promised headings scored below one that wrote none: the
+        # two it wrote switched on conditional rules that then failed for the
+        # four it had already been marked down for.
+        if rule.then in promised_keys:
             continue
         record("medium", rule.then in present)
         if rule.then in present:
