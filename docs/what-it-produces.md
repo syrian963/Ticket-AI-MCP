@@ -8,6 +8,11 @@ already there and no key is involved. The board is a corpus of twenty-one
 tickets for a warehouse tool that exists only in this file, so the samples can
 be printed in full without publishing anyone's product.
 
+> **Measured before `promised` existed, and not recomputed.** A draft is now held to
+> the skeleton it was handed, so the check counts below and the scores beside them
+> would come out differently today. The run was real; the figures are not current.
+> See `docs/evaluating-compose.md`.
+
 | | Alignment | Checks | Length |
 |---|---|---|---|
 | Etikettendruck bricht ab | 100% | 7 | 1128 |

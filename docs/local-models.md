@@ -24,6 +24,16 @@ Seven titles, three boards, one profile learned per board beforehand.
 `alignment` is the share of applicable checks the draft passed, measured
 against that board's own tickets.
 
+> **Measured before `promised` existed, and not recomputed.** Since
+> `d3f7786` (see [evaluating-compose.md](evaluating-compose.md)) a draft is held to the skeleton it
+> was handed: those headings are checked unconditionally, so both the check
+> counts and the scores on this page would come out differently today. The runs
+> were real and the figures are what they were. **They are not current, and the
+> numbers here should not be compared against a run made now.** Rerunning them
+> needs the same models against the same boards, and one of the three boards is
+> a private one whose tickets cannot be republished.
+
+
 | Board | Ticket | Alignment | Checks | Attempts | Time |
 |---|---|---|---|---|---|
 | a private board (GitLab, German) | filter | 100% | 3 | 2 | 51s |
