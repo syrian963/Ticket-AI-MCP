@@ -99,12 +99,9 @@ def probe(kind: str, board: str, *, sample: int, keep: int) -> None:
 
         skeleton = {h for h, _ in profile.skeleton()}
         by_rate = {s.heading for s in profile.sections if s.rate >= FLOOR}
-        pairs = sorted(
-            (c for c in profile.conditionals if c.rate >= FLOOR), key=lambda c: -c.rate
-        )
+        pairs = sorted((c for c in profile.conditionals if c.rate >= FLOOR), key=lambda c: -c.rate)
         strongest = (
-            f"{pairs[0].when_heading} -> {pairs[0].then_heading} "
-            f"{pairs[0].count}/{pairs[0].of}"
+            f"{pairs[0].when_heading} -> {pairs[0].then_heading} {pairs[0].count}/{pairs[0].of}"
             if pairs
             else "-"
         )
@@ -112,12 +109,11 @@ def probe(kind: str, board: str, *, sample: int, keep: int) -> None:
         print(
             f"  {kind:6s} {board:42s} n={len(gathered.exemplars):2d} "
             f"skeleton={len(skeleton)} (rate {len(by_rate)}, pair {len(skeleton - by_rate)})"
-            f" | {rates}"
-            + ("  <-- near the threshold" if near else ""),
+            f" | {rates}" + ("  <-- near the threshold" if near else ""),
             flush=True,
         )
         if pairs:
-            print(f"  {"":6s} {"":42s} strongest pair: {strongest}", flush=True)
+            print(f"  {'':6s} {'':42s} strongest pair: {strongest}", flush=True)
     except Exception as exc:
         # One board that will not answer should not cost the other eleven. The
         # distribution is the output, and a gap in it is better than no output.

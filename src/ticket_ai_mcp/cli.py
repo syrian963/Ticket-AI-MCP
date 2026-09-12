@@ -264,7 +264,9 @@ def cmd_eval(args: argparse.Namespace) -> int:
                 print(f"  {p.done + 1}/{p.total} {p.board} {p.case}", file=sys.stderr)
 
         out = Path(args.out or "evals/results/latest.jsonl")
-        written = write_runs(out, run_suite(boards, writer, repeats=args.repeats, on_progress=progress))
+        written = write_runs(
+            out, run_suite(boards, writer, repeats=args.repeats, on_progress=progress)
+        )
         print(f"  wrote {written} records to {out}", file=sys.stderr)
         runs = read_runs(out)
 
@@ -529,7 +531,9 @@ def build_parser() -> argparse.ArgumentParser:
     ev = sub.add_parser("eval", help="run the frozen dataset and mark the result")
     ev.add_argument("--dataset", help="a dataset directory other than evals/dataset")
     ev.add_argument("--runs", help="score an existing results file instead of composing")
-    ev.add_argument("--out", help="where to append the records (default evals/results/latest.jsonl)")
+    ev.add_argument(
+        "--out", help="where to append the records (default evals/results/latest.jsonl)"
+    )
     ev.add_argument("--repeats", type=int, default=1, help="times to run every case")
     ev.add_argument("--baseline", help="a baseline file to mark against")
     ev.add_argument("--update-baseline", action="store_true", help="write the baseline instead")
